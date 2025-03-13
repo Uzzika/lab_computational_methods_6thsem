@@ -14,26 +14,26 @@ def generate_matrix(n, mode='random'):
     else:
         return np.zeros((n, n))
 
-def generate_chi(n):
-    """Генерация вектора chi (случайные значения от 0 до 1)."""
+def generate_x(n):
+    """Генерация вектора x (случайные значения от 0 до 1)."""
     return np.random.rand(n)
 
-def calculate_D(C, chi):
-    """Вычисление матрицы D на основе матрицы C и вектора chi."""
+def calculate_D(C, x):
+    """Вычисление матрицы D на основе матрицы C и вектора x."""
     n = len(C)
     D = np.zeros((n, n))
     for j in range(n):
         for i in range(n):
-            D[i, j] = sum((1 - chi[s]) * C[s, j] for s in range(j)) + (1 - chi[i]) * C[i, j] + sum(chi[s] * C[s, j] for s in range(n))
+            D[i, j] = sum((1 - x[s]) * C[s, j] for s in range(j)) + (1 - x[i]) * C[i, j] + sum(x[s] * C[s, j] for s in range(n))
     return D
 
-def calculate_G_tilde(C, chi):
+def calculate_G_tilde(C, x):
     """Вычисление матрицы G с тильдой (формула 24 из пособия)."""
     n = len(C)
     G_tilde = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            G_tilde[i, j] = sum((1 - chi[i]) * C[i, s] for s in range(j, n))
+            G_tilde[i, j] = sum((1 - x[i]) * C[i, s] for s in range(j, n))
     return G_tilde
 
 def greedy_strategy(D):
@@ -57,16 +57,32 @@ def hungarian_algorithm(G_tilde):
     row_ind, col_ind = linear_sum_assignment(-G_tilde)
     return col_ind
 
-def calculate_S1(D, assignment, chi, C):
+def min_strategy(D):
+    """Минимальная стратегия: для каждого столбца выбираем строку с минимальным значением."""
+    n = len(D)
+    assignment = [np.argmin(D[:, j]) for j in range(n)]
+    return assignment
+
+def max_strategy(D):
+    """Максимальная стратегия: для каждого столбца выбираем строку с максимальным значением."""
+    n = len(D)
+    assignment = [np.argmax(D[:, j]) for j in range(n)]
+    return assignment
+
+def random_strategy(D):
+    """Случайная стратегия: для каждого столбца выбираем случайную строку."""
+    n = len(D)
+    assignment = [np.random.choice(range(n)) for _ in range(n)]
+    return assignment
+
+def calculate_S1(D, assignment, x, C):
     """Вычисление целевой функции S1."""
     n = len(D)
-    # Первая часть S1: сумма d_{sigma(j), j} для назначенных групп
     S1_part1 = sum(D[assignment[j], j] for j in range(n))
-    # Вторая часть S1: сумма chi_s * c_sj для всех s и j
-    S1_part2 = sum(chi[s] * C[s, j] for j in range(n) for s in range(n))
+    S1_part2 = sum(x[s] * C[s, j] for j in range(n) for s in range(n))
     return S1_part1 + S1_part2
 
-def calculate_S2(D_tilde, assignment, chi, C):
+def calculate_S2(D_tilde, assignment, x, C):
     """Вычисление целевой функции S2 для матрицы D_tilde."""
     n = len(D_tilde)
     S2 = sum(D_tilde[assignment[j], j] for j in range(n))
@@ -83,15 +99,15 @@ def run_analysis():
     n = int(entry_n.get())
     mode = matrix_mode.get()
     
-    # Генерация матрицы C и вектора chi
+    # Генерация матрицы C и вектора x
     C = generate_matrix(n, mode)
-    chi = generate_chi(n)
+    x = generate_x(n)
     
     # Вычисление матрицы D
-    D = calculate_D(C, chi)
+    D = calculate_D(C, x)
     
     # Вычисление матрицы G с тильдой
-    G_tilde = calculate_G_tilde(C, chi)
+    G_tilde = calculate_G_tilde(C, x)
     
     # Применение жадной стратегии к D
     greedy_assignment = greedy_strategy(D)
@@ -99,23 +115,40 @@ def run_analysis():
     # Применение Венгерского алгоритма к G_tilde
     hungarian_assignment = hungarian_algorithm(G_tilde)
     
-    # Вычисление целевых функций для обеих стратегий
-    S1_greedy = calculate_S1(D, greedy_assignment, chi, C)
-    S2_greedy = calculate_S2(D, greedy_assignment, chi, C)
+    # Применение минимальной, максимальной и случайной стратегии
+    min_assignment = min_strategy(D)
+    max_assignment = max_strategy(D)
+    random_assignment = random_strategy(D)
+    
+    # Вычисление целевых функций для всех стратегий
+    S1_greedy = calculate_S1(D, greedy_assignment, x, C)
+    S1_min = calculate_S1(D, min_assignment, x, C)
+    S1_max = calculate_S1(D, max_assignment, x, C)
+    S1_random = calculate_S1(D, random_assignment, x, C)
+    
+    S2_greedy = calculate_S2(D, greedy_assignment, x, C)
+    S2_min = calculate_S2(D, min_assignment, x, C)
+    S2_max = calculate_S2(D, max_assignment, x, C)
+    S2_random = calculate_S2(D, random_assignment, x, C)
+    
     S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
     
     # Оценка проигрыша жадной стратегии
-    loss = S3_hungarian - S1_greedy
+    loss_greedy_min = S3_hungarian - S1_min
+    loss_greedy_max = S3_hungarian - S1_max
+    loss_greedy_random = S3_hungarian - S1_random
     
     # Вывод результатов
     result_text = (
         f"Матрица C:\n{C}\n\n"
-        f"Вектор chi:\n{chi}\n\n"
+        f"Вектор x:\n{x}\n\n"
         f"Матрица D:\n{D}\n\n"
         f"Матрица G с тильдой:\n{G_tilde}\n\n"
         f"Жадная стратегия (назначения): {greedy_assignment}, S1 = {S1_greedy}, S2 = {S2_greedy}\n"
-        f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n\n"
-        f"Оценка проигрыша жадной стратегии: {loss}\n"
+        f"Минимальная стратегия (назначения): {min_assignment}, S1 = {S1_min}, S2 = {S2_min}, Потери = {loss_greedy_min}\n"
+        f"Максимальная стратегия (назначения): {max_assignment}, S1 = {S1_max}, S2 = {S2_max}, Потери = {loss_greedy_max}\n"
+        f"Случайная стратегия (назначения): {random_assignment}, S1 = {S1_random}, S2 = {S2_random}, Потери = {loss_greedy_random}\n"
+        f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n"
     )
     
     messagebox.showinfo("Результаты анализа", result_text)
