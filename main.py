@@ -1,18 +1,31 @@
 import numpy as np
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import font as tkFont
 from scipy.optimize import linear_sum_assignment
 
-def generate_matrix(n, mode='random'):
+def generate_matrix(n, mode='random', row_mode='random', col_mode='random'):
     """Генерация матрицы C в зависимости от режима."""
     if mode == 'random':
-        return np.random.rand(n, n) * 100
+        C = np.random.rand(n, n) * 100
     elif mode == 'increasing':
-        return np.array([[i * j for j in range(1, n+1)] for i in range(1, n+1)])
+        C = np.array([[i * j for j in range(1, n+1)] for i in range(1, n+1)])
     elif mode == 'decreasing':
-        return np.array([[1/(i * j) for j in range(1, n+1)] for i in range(1, n+1)])
+        C = np.array([[1/(i * j) for j in range(1, n+1)] for i in range(1, n+1)])
     else:
-        return np.zeros((n, n))
+        C = np.zeros((n, n))
+
+    # Применяем дополнительные изменения для строк или столбцов
+    if row_mode == 'increasing':
+        C = np.sort(C, axis=1)  # Сортировка строк по возрастанию
+    elif row_mode == 'decreasing':
+        C = np.sort(C, axis=1)[:, ::-1]  # Сортировка строк по убыванию
+
+    if col_mode == 'increasing':
+        C = np.sort(C, axis=0)  # Сортировка столбцов по возрастанию
+    elif col_mode == 'decreasing':
+        C = np.sort(C, axis=0)[::-1, :]  # Сортировка столбцов по убыванию
+
+    return C
 
 def generate_x(n):
     """Генерация вектора x (случайные значения от 0 до 1)."""
@@ -28,7 +41,7 @@ def calculate_D(C, x):
     return D
 
 def calculate_G_tilde(C, x):
-    """Вычисление матрицы G с тильдой (формула 24 из пособия)."""
+    """Вычисление матрицы G с тильдой."""
     n = len(C)
     G_tilde = np.zeros((n, n))
     for i in range(n):
@@ -98,47 +111,49 @@ def run_analysis():
     """Запуск анализа."""
     n = int(entry_n.get())
     mode = matrix_mode.get()
-    
+    row_mode = row_mode_var.get()
+    col_mode = col_mode_var.get()
+
     # Генерация матрицы C и вектора x
-    C = generate_matrix(n, mode)
+    C = generate_matrix(n, mode, row_mode, col_mode)
     x = generate_x(n)
-    
+
     # Вычисление матрицы D
     D = calculate_D(C, x)
-    
+
     # Вычисление матрицы G с тильдой
     G_tilde = calculate_G_tilde(C, x)
-    
+
     # Применение жадной стратегии к D
     greedy_assignment = greedy_strategy(D)
-    
+
     # Применение Венгерского алгоритма к G_tilde
     hungarian_assignment = hungarian_algorithm(G_tilde)
-    
+
     # Применение минимальной, максимальной и случайной стратегии
     min_assignment = min_strategy(D)
     max_assignment = max_strategy(D)
     random_assignment = random_strategy(D)
-    
+
     # Вычисление целевых функций для всех стратегий
     S1_greedy = calculate_S1(D, greedy_assignment, x, C)
     S1_min = calculate_S1(D, min_assignment, x, C)
     S1_max = calculate_S1(D, max_assignment, x, C)
     S1_random = calculate_S1(D, random_assignment, x, C)
-    
+
     S2_greedy = calculate_S2(D, greedy_assignment, x, C)
     S2_min = calculate_S2(D, min_assignment, x, C)
     S2_max = calculate_S2(D, max_assignment, x, C)
     S2_random = calculate_S2(D, random_assignment, x, C)
-    
+
     S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
-    
+
     # Оценка проигрыша жадной стратегии
     loss_greedy_min = S3_hungarian - S1_min
     loss_greedy_max = S3_hungarian - S1_max
     loss_greedy_random = S3_hungarian - S1_random
-    
-    # Вывод результатов
+
+    # Формирование строки для вывода
     result_text = (
         f"Матрица C:\n{C}\n\n"
         f"Вектор x:\n{x}\n\n"
@@ -150,23 +165,50 @@ def run_analysis():
         f"Случайная стратегия (назначения): {random_assignment}, S1 = {S1_random}, S2 = {S2_random}, Потери = {loss_greedy_random}\n"
         f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n"
     )
-    
-    messagebox.showinfo("Результаты анализа", result_text)
+
+    # Вывод результатов в текстовое поле
+    text_output.delete(1.0, tk.END)  # Очищаем текстовое поле перед выводом
+    text_output.insert(tk.END, result_text)  # Вставляем текст в текстовое поле
 
 # Создание графического интерфейса
 root = tk.Tk()
 root.title("Анализ стратегий")
+root.geometry("800x700")  # Установка размера окна
 
-tk.Label(root, text="Размер матрицы (n):").grid(row=0, column=0)
-entry_n = tk.Entry(root)
-entry_n.grid(row=0, column=1)
+# Настройка шрифтов
+font_style = tkFont.Font(family="Helvetica", size=12)
 
-tk.Label(root, text="Режим генерации матрицы C:").grid(row=1, column=0)
+# Настройка отступов
+pad_x = 10
+pad_y = 5
+
+# Элементы интерфейса
+tk.Label(root, text="Размер матрицы (n):", font=font_style).grid(row=0, column=0, padx=pad_x, pady=pad_y)
+entry_n = tk.Entry(root, font=font_style, width=10)
+entry_n.grid(row=0, column=1, padx=pad_x, pady=pad_y)
+
+tk.Label(root, text="Режим генерации матрицы C:", font=font_style).grid(row=1, column=0, padx=pad_x, pady=pad_y)
 matrix_mode = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Случайная", variable=matrix_mode, value='random').grid(row=1, column=1)
-tk.Radiobutton(root, text="Возрастающая", variable=matrix_mode, value='increasing').grid(row=1, column=2)
-tk.Radiobutton(root, text="Убывающая", variable=matrix_mode, value='decreasing').grid(row=1, column=3)
+tk.Radiobutton(root, text="Случайная", variable=matrix_mode, value='random', font=font_style).grid(row=1, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Возрастающая", variable=matrix_mode, value='increasing', font=font_style).grid(row=1, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающая", variable=matrix_mode, value='decreasing', font=font_style).grid(row=1, column=3, padx=pad_x, pady=pad_y)
 
-tk.Button(root, text="Запустить анализ", command=run_analysis).grid(row=2, column=0, columnspan=4)
+tk.Label(root, text="Изменение строк:", font=font_style).grid(row=2, column=0, padx=pad_x, pady=pad_y)
+row_mode_var = tk.StringVar(value='random')
+tk.Radiobutton(root, text="Возрастающие", variable=row_mode_var, value='increasing', font=font_style).grid(row=2, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающие", variable=row_mode_var, value='decreasing', font=font_style).grid(row=2, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Случайные", variable=row_mode_var, value='random', font=font_style).grid(row=2, column=3, padx=pad_x, pady=pad_y)
+
+tk.Label(root, text="Изменение столбцов:", font=font_style).grid(row=3, column=0, padx=pad_x, pady=pad_y)
+col_mode_var = tk.StringVar(value='random')
+tk.Radiobutton(root, text="Возрастающие", variable=col_mode_var, value='increasing', font=font_style).grid(row=3, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающие", variable=col_mode_var, value='decreasing', font=font_style).grid(row=3, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Случайные", variable=col_mode_var, value='random', font=font_style).grid(row=3, column=3, padx=pad_x, pady=pad_y)
+
+tk.Button(root, text="Запустить анализ", command=run_analysis, font=font_style, width=20).grid(row=4, column=0, columnspan=4, pady=pad_y)
+
+# Текстовое поле для вывода результатов
+text_output = tk.Text(root, height=40, width=80, font=font_style)  # Увеличена высота окна вывода
+text_output.grid(row=5, column=0, columnspan=4, padx=pad_x, pady=pad_y)
 
 root.mainloop()
