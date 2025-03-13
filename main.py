@@ -155,60 +155,77 @@ def run_analysis():
 
     # Формирование строки для вывода
     result_text = (
-        f"Матрица C:\n{C}\n\n"
-        f"Вектор x:\n{x}\n\n"
-        f"Матрица D:\n{D}\n\n"
-        f"Матрица G с тильдой:\n{G_tilde}\n\n"
         f"Жадная стратегия (назначения): {greedy_assignment}, S1 = {S1_greedy}, S2 = {S2_greedy}\n"
         f"Минимальная стратегия (назначения): {min_assignment}, S1 = {S1_min}, S2 = {S2_min}, Потери = {loss_greedy_min}\n"
         f"Максимальная стратегия (назначения): {max_assignment}, S1 = {S1_max}, S2 = {S2_max}, Потери = {loss_greedy_max}\n"
         f"Случайная стратегия (назначения): {random_assignment}, S1 = {S1_random}, S2 = {S2_random}, Потери = {loss_greedy_random}\n"
-        f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n"
+        f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n\n"
+        f"Матрица C:\n{C}\n\n"
+        f"Вектор x:\n{x}\n\n"
+        f"Матрица D:\n{D}\n\n"
+        f"Матрица G с тильдой:\n{G_tilde}\n\n"
     )
 
     # Вывод результатов в текстовое поле
     text_output.delete(1.0, tk.END)  # Очищаем текстовое поле перед выводом
     text_output.insert(tk.END, result_text)  # Вставляем текст в текстовое поле
 
+    # Выделяем жирным текст, который нужно выделить
+    text_output.tag_configure("bold", font=("Segoe UI", 12, "bold"))
+
+    # Используем метод index для корректных индексов
+    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Жадная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Жадная стратегия") + len("Жадная стратегия"))))
+    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Минимальная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Минимальная стратегия") + len("Минимальная стратегия"))))
+    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Максимальная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Максимальная стратегия") + len("Максимальная стратегия"))))
+    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Случайная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Случайная стратегия") + len("Случайная стратегия"))))
+    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Венгерский алгоритм")), text_output.index("1.0 + %dc" % (result_text.find("Венгерский алгоритм") + len("Венгерский алгоритм"))))
+
 # Создание графического интерфейса
 root = tk.Tk()
 root.title("Анализ стратегий")
-root.geometry("800x700")  # Установка размера окна
+root.geometry("800x800")  # Установка размера окна
 
-# Настройка шрифтов
-font_style = tkFont.Font(family="Helvetica", size=12)
+# Настройка шрифтов с округлыми чертами (Montserrat, без жирного)
+font_style = tkFont.Font(family="Segoe UI", size=12)  # Используем "Segoe UI", без жирного шрифта
 
 # Настройка отступов
 pad_x = 10
 pad_y = 5
 
 # Элементы интерфейса
-tk.Label(root, text="Размер матрицы (n):", font=font_style).grid(row=0, column=0, padx=pad_x, pady=pad_y)
-entry_n = tk.Entry(root, font=font_style, width=10)
+root.configure(bg="#F4F4F9")  # Фон всего окна в пастельном оттенке
+
+tk.Label(root, text="Размер матрицы (n):", font=font_style, bg="#F4F4F9").grid(row=0, column=0, padx=pad_x, pady=pad_y)
+entry_n = tk.Entry(root, font=font_style, width=10, bd=2, relief="solid", bg="#E8F0F2")  # Заменил rounded на solid
 entry_n.grid(row=0, column=1, padx=pad_x, pady=pad_y)
 
-tk.Label(root, text="Режим генерации матрицы C:", font=font_style).grid(row=1, column=0, padx=pad_x, pady=pad_y)
+tk.Label(root, text="Режим генерации матрицы C:", font=font_style, bg="#F4F4F9").grid(row=1, column=0, padx=pad_x, pady=pad_y)
 matrix_mode = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Случайная", variable=matrix_mode, value='random', font=font_style).grid(row=1, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Возрастающая", variable=matrix_mode, value='increasing', font=font_style).grid(row=1, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающая", variable=matrix_mode, value='decreasing', font=font_style).grid(row=1, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Случайная", variable=matrix_mode, value='random', font=font_style, bg="#F4F4F9").grid(row=1, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Возрастающая", variable=matrix_mode, value='increasing', font=font_style, bg="#F4F4F9").grid(row=1, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающая", variable=matrix_mode, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=1, column=3, padx=pad_x, pady=pad_y)
 
-tk.Label(root, text="Изменение строк:", font=font_style).grid(row=2, column=0, padx=pad_x, pady=pad_y)
+tk.Label(root, text="Изменение строк:", font=font_style, bg="#F4F4F9").grid(row=2, column=0, padx=pad_x, pady=pad_y)
 row_mode_var = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Возрастающие", variable=row_mode_var, value='increasing', font=font_style).grid(row=2, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающие", variable=row_mode_var, value='decreasing', font=font_style).grid(row=2, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Случайные", variable=row_mode_var, value='random', font=font_style).grid(row=2, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Возрастающие", variable=row_mode_var, value='increasing', font=font_style, bg="#F4F4F9").grid(row=2, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающие", variable=row_mode_var, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=2, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Случайные", variable=row_mode_var, value='random', font=font_style, bg="#F4F4F9").grid(row=2, column=3, padx=pad_x, pady=pad_y)
 
-tk.Label(root, text="Изменение столбцов:", font=font_style).grid(row=3, column=0, padx=pad_x, pady=pad_y)
+tk.Label(root, text="Изменение столбцов:", font=font_style, bg="#F4F4F9").grid(row=3, column=0, padx=pad_x, pady=pad_y)
 col_mode_var = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Возрастающие", variable=col_mode_var, value='increasing', font=font_style).grid(row=3, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающие", variable=col_mode_var, value='decreasing', font=font_style).grid(row=3, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Случайные", variable=col_mode_var, value='random', font=font_style).grid(row=3, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Возрастающие", variable=col_mode_var, value='increasing', font=font_style, bg="#F4F4F9").grid(row=3, column=1, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Убывающие", variable=col_mode_var, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=3, column=2, padx=pad_x, pady=pad_y)
+tk.Radiobutton(root, text="Случайные", variable=col_mode_var, value='random', font=font_style, bg="#F4F4F9").grid(row=3, column=3, padx=pad_x, pady=pad_y)
 
-tk.Button(root, text="Запустить анализ", command=run_analysis, font=font_style, width=20).grid(row=4, column=0, columnspan=4, pady=pad_y)
+tk.Button(root, text="Запустить анализ", command=run_analysis, font=font_style, width=20, relief="raised", bg="#A3C1AD").grid(row=4, column=0, columnspan=4, pady=pad_y)
 
 # Текстовое поле для вывода результатов
-text_output = tk.Text(root, height=40, width=80, font=font_style)  # Увеличена высота окна вывода
+text_output = tk.Text(root, height=30, width=80, font=font_style, bd=2, relief="sunken", wrap=tk.WORD)
 text_output.grid(row=5, column=0, columnspan=4, padx=pad_x, pady=pad_y)
+
+# Добавление полосы прокрутки
+scrollbar = tk.Scrollbar(root, command=text_output.yview)
+scrollbar.grid(row=5, column=4, sticky='ns')
+text_output.config(yscrollcommand=scrollbar.set)
 
 root.mainloop()
