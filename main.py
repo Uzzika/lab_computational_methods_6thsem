@@ -1,6 +1,7 @@
 import numpy as np
 import tkinter as tk
 from tkinter import font as tkFont
+from tkinter import ttk
 from scipy.optimize import linear_sum_assignment
 
 def generate_matrix(n, mode='random', row_mode='random', col_mode='random'):
@@ -31,22 +32,22 @@ def generate_x(n):
     """Генерация вектора x (случайные значения от 0 до 1)."""
     return np.random.rand(n)
 
-def calculate_D(C, x):
-    """Вычисление матрицы D на основе матрицы C и вектора x."""
+def calculate_D(C, x, chi):
+    """Вычисление матрицы D на основе матрицы C, вектора x и коэффициента chi."""
     n = len(C)
     D = np.zeros((n, n))
     for j in range(n):
         for i in range(n):
-            D[i, j] = sum((1 - x[s]) * C[s, j] for s in range(j)) + (1 - x[i]) * C[i, j] + sum(x[s] * C[s, j] for s in range(n))
+            D[i, j] = sum((1 - chi[s]) * C[s, j] for s in range(j)) + (1 - chi[i]) * C[i, j] + sum(chi[s] * C[s, j] for s in range(n))
     return D
 
-def calculate_G_tilde(C, x):
+def calculate_G_tilde(C, x, chi):
     """Вычисление матрицы G с тильдой."""
     n = len(C)
     G_tilde = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
-            G_tilde[i, j] = sum((1 - x[i]) * C[i, s] for s in range(j, n))
+            G_tilde[i, j] = sum((1 - chi[i]) * C[i, s] for s in range(j, n))
     return G_tilde
 
 def greedy_strategy(D):
@@ -88,14 +89,14 @@ def random_strategy(D):
     assignment = [np.random.choice(range(n)) for _ in range(n)]
     return assignment
 
-def calculate_S1(D, assignment, x, C):
-    """Вычисление целевой функции S1."""
+def calculate_S1(D, assignment, x, C, chi):
+    """Вычисление целевой функции S1 с учетом коэффициента chi."""
     n = len(D)
     S1_part1 = sum(D[assignment[j], j] for j in range(n))
     S1_part2 = sum(x[s] * C[s, j] for j in range(n) for s in range(n))
     return S1_part1 + S1_part2
 
-def calculate_S2(D_tilde, assignment, x, C):
+def calculate_S2(D_tilde, assignment, x, C, chi):
     """Вычисление целевой функции S2 для матрицы D_tilde."""
     n = len(D_tilde)
     S2 = sum(D_tilde[assignment[j], j] for j in range(n))
@@ -117,12 +118,13 @@ def run_analysis():
     # Генерация матрицы C и вектора x
     C = generate_matrix(n, mode, row_mode, col_mode)
     x = generate_x(n)
+    chi = np.random.rand(n)  # Генерация коэффициентов chi
 
     # Вычисление матрицы D
-    D = calculate_D(C, x)
+    D = calculate_D(C, x, chi)
 
     # Вычисление матрицы G с тильдой
-    G_tilde = calculate_G_tilde(C, x)
+    G_tilde = calculate_G_tilde(C, x, chi)
 
     # Применение жадной стратегии к D
     greedy_assignment = greedy_strategy(D)
@@ -136,15 +138,15 @@ def run_analysis():
     random_assignment = random_strategy(D)
 
     # Вычисление целевых функций для всех стратегий
-    S1_greedy = calculate_S1(D, greedy_assignment, x, C)
-    S1_min = calculate_S1(D, min_assignment, x, C)
-    S1_max = calculate_S1(D, max_assignment, x, C)
-    S1_random = calculate_S1(D, random_assignment, x, C)
+    S1_greedy = calculate_S1(D, greedy_assignment, x, C, chi)
+    S1_min = calculate_S1(D, min_assignment, x, C, chi)
+    S1_max = calculate_S1(D, max_assignment, x, C, chi)
+    S1_random = calculate_S1(D, random_assignment, x, C, chi)
 
-    S2_greedy = calculate_S2(D, greedy_assignment, x, C)
-    S2_min = calculate_S2(D, min_assignment, x, C)
-    S2_max = calculate_S2(D, max_assignment, x, C)
-    S2_random = calculate_S2(D, random_assignment, x, C)
+    S2_greedy = calculate_S2(D, greedy_assignment, x, C, chi)
+    S2_min = calculate_S2(D, min_assignment, x, C, chi)
+    S2_max = calculate_S2(D, max_assignment, x, C, chi)
+    S2_random = calculate_S2(D, random_assignment, x, C, chi)
 
     S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
@@ -183,49 +185,94 @@ def run_analysis():
 # Создание графического интерфейса
 root = tk.Tk()
 root.title("Анализ стратегий")
-root.geometry("800x800")  # Установка размера окна
+root.geometry("800x950")  # Увеличили размер окна для удобства
 
-# Настройка шрифтов с округлыми чертами (Montserrat, без жирного)
-font_style = tkFont.Font(family="Segoe UI", size=12)  # Используем "Segoe UI", без жирного шрифта
+# Установка минимального размера окна
+root.minsize(600, 700)  # Минимальная ширина: 600, минимальная высота: 700
+
+# Настройка шрифтов
+font_style = tkFont.Font(family="Segoe UI", size=12)  # Используем "Segoe UI"
+font_bold = tkFont.Font(family="Segoe UI", size=12, weight="bold")
 
 # Настройка отступов
-pad_x = 10
-pad_y = 5
+pad_x = 15
+pad_y = 10
 
-# Элементы интерфейса
-root.configure(bg="#F4F4F9")  # Фон всего окна в пастельном оттенке
+# Новая палитра цветов
+bg_color = "#27296D"  # Основной фон окна (темно-синий)
+btn_color = "#A393EB"  # Цвет кнопок (светло-фиолетовый)
+btn_hover_color = "#C6A9FF"  # Цвет кнопок при наведении (яркий сиреневый)
+text_bg_color = "#F5F5F5"  # Цвет фона текстового поля (очень светлый серый)
+text_color = "#333333"  # Цвет текста (темно-серый)
+frame_bg_color = "#5E63B6"  # Цвет фона фрейма ввода (средний синий)
+border_color = "#BBA9FF"  # Цвет рамок и акцентов (мягкий сиреневый)
+highlight_color = "#D9CFFF"  # Дополнительный цвет для выделения (пастельный сиреневый)
 
-tk.Label(root, text="Размер матрицы (n):", font=font_style, bg="#F4F4F9").grid(row=0, column=0, padx=pad_x, pady=pad_y)
-entry_n = tk.Entry(root, font=font_style, width=10, bd=2, relief="solid", bg="#E8F0F2")  # Заменил rounded на solid
-entry_n.grid(row=0, column=1, padx=pad_x, pady=pad_y)
+root.configure(bg=bg_color)  # Устанавливаем новый фон окна
 
-tk.Label(root, text="Режим генерации матрицы C:", font=font_style, bg="#F4F4F9").grid(row=1, column=0, padx=pad_x, pady=pad_y)
+# Функция для изменения цвета кнопки при наведении
+def on_button_enter(event, button):
+    button.config(bg=btn_hover_color)
+
+def on_button_leave(event, button):
+    button.config(bg=btn_color)
+
+# Фрейм для ввода данных
+input_frame = ttk.Frame(root, padding=(10, 10), style="InputFrame.TFrame")
+input_frame.grid(row=0, column=0, columnspan=4, sticky="nsew", padx=20, pady=20)  # Добавляем отступы
+
+# Настройка стилей
+style = ttk.Style()
+style.configure("InputFrame.TFrame", background=frame_bg_color)
+
+# Настройка растягивания столбцов и строк внутри input_frame
+for i in range(4):
+    input_frame.columnconfigure(i, weight=1)  # Столбцы растягиваются равномерно
+input_frame.rowconfigure(4, weight=1)  # Последняя строка растягивается
+
+# Лейблы и элементы ввода
+tk.Label(input_frame, text="Размер матрицы (n):", font=font_style, bg=frame_bg_color, fg=text_color).grid(row=0, column=0, padx=pad_x, pady=pad_y, sticky="w")
+entry_n = tk.Entry(input_frame, font=font_style, width=10, bd=2, relief="solid", bg=text_bg_color, fg=text_color, highlightbackground=border_color)
+entry_n.grid(row=0, column=1, padx=pad_x, pady=pad_y, sticky="ew")
+
+tk.Label(input_frame, text="Режим генерации матрицы C:", font=font_style, bg=frame_bg_color, fg=text_color).grid(row=1, column=0, padx=pad_x, pady=pad_y, sticky="w")
 matrix_mode = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Случайная", variable=matrix_mode, value='random', font=font_style, bg="#F4F4F9").grid(row=1, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Возрастающая", variable=matrix_mode, value='increasing', font=font_style, bg="#F4F4F9").grid(row=1, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающая", variable=matrix_mode, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=1, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(input_frame, text="Случайная", variable=matrix_mode, value='random', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=1, column=1, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Возрастающая", variable=matrix_mode, value='increasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=1, column=2, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Убывающая", variable=matrix_mode, value='decreasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=1, column=3, padx=pad_x, pady=pad_y, sticky="w")
 
-tk.Label(root, text="Изменение строк:", font=font_style, bg="#F4F4F9").grid(row=2, column=0, padx=pad_x, pady=pad_y)
+tk.Label(input_frame, text="Изменение строк:", font=font_style, bg=frame_bg_color, fg=text_color).grid(row=2, column=0, padx=pad_x, pady=pad_y, sticky="w")
 row_mode_var = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Возрастающие", variable=row_mode_var, value='increasing', font=font_style, bg="#F4F4F9").grid(row=2, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающие", variable=row_mode_var, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=2, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Случайные", variable=row_mode_var, value='random', font=font_style, bg="#F4F4F9").grid(row=2, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(input_frame, text="Возрастающие", variable=row_mode_var, value='increasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=2, column=1, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Убывающие", variable=row_mode_var, value='decreasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=2, column=2, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Случайные", variable=row_mode_var, value='random', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=2, column=3, padx=pad_x, pady=pad_y, sticky="w")
 
-tk.Label(root, text="Изменение столбцов:", font=font_style, bg="#F4F4F9").grid(row=3, column=0, padx=pad_x, pady=pad_y)
+tk.Label(input_frame, text="Изменение столбцов:", font=font_style, bg=frame_bg_color, fg=text_color).grid(row=3, column=0, padx=pad_x, pady=pad_y, sticky="w")
 col_mode_var = tk.StringVar(value='random')
-tk.Radiobutton(root, text="Возрастающие", variable=col_mode_var, value='increasing', font=font_style, bg="#F4F4F9").grid(row=3, column=1, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Убывающие", variable=col_mode_var, value='decreasing', font=font_style, bg="#F4F4F9").grid(row=3, column=2, padx=pad_x, pady=pad_y)
-tk.Radiobutton(root, text="Случайные", variable=col_mode_var, value='random', font=font_style, bg="#F4F4F9").grid(row=3, column=3, padx=pad_x, pady=pad_y)
+tk.Radiobutton(input_frame, text="Возрастающие", variable=col_mode_var, value='increasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=3, column=1, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Убывающие", variable=col_mode_var, value='decreasing', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=3, column=2, padx=pad_x, pady=pad_y, sticky="w")
+tk.Radiobutton(input_frame, text="Случайные", variable=col_mode_var, value='random', font=font_style, bg=frame_bg_color, fg=text_color).grid(row=3, column=3, padx=pad_x, pady=pad_y, sticky="w")
 
-tk.Button(root, text="Запустить анализ", command=run_analysis, font=font_style, width=20, relief="raised", bg="#A3C1AD").grid(row=4, column=0, columnspan=4, pady=pad_y)
+# Кнопка запуска анализа
+button = tk.Button(root, text="Запустить анализ", command=run_analysis, bg=btn_color, fg=text_color, font=font_style, relief="raised", bd=2)
+button.grid(row=4, column=0, columnspan=4, pady=pad_y, sticky="ew", padx=20)  # Центрируем кнопку
+
+# Наведение на кнопку для изменения цвета
+button.bind("<Enter>", lambda event, button=button: on_button_enter(event, button))
+button.bind("<Leave>", lambda event, button=button: on_button_leave(event, button))
 
 # Текстовое поле для вывода результатов
-text_output = tk.Text(root, height=30, width=80, font=font_style, bd=2, relief="sunken", wrap=tk.WORD)
-text_output.grid(row=5, column=0, columnspan=4, padx=pad_x, pady=pad_y)
+text_output = tk.Text(root, height=30, width=80, font=font_style, bd=2, relief="sunken", wrap=tk.WORD, bg=text_bg_color, fg=text_color, highlightbackground=border_color)
+text_output.grid(row=5, column=0, columnspan=4, padx=20, pady=20, sticky="nsew")  # Центрируем текстовое поле
 
 # Добавление полосы прокрутки
 scrollbar = tk.Scrollbar(root, command=text_output.yview)
 scrollbar.grid(row=5, column=4, sticky='ns')
 text_output.config(yscrollcommand=scrollbar.set)
+
+# Настройка растягивания строк и столбцов
+for i in range(4):
+    root.columnconfigure(i, weight=1)  # Все столбцы растягиваются равномерно
+root.rowconfigure(5, weight=1)  # Текстовое поле растягивается по вертикали
 
 root.mainloop()
