@@ -6,20 +6,53 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 from logic import *
 
+def _format_matrix(self, matrix):
+    """Форматирует матрицу в виде HTML-таблицы."""
+    n = len(matrix)
+    html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
+    for i in range(n):
+        html += "<tr>"
+        for j in range(n):
+            html += f"<td style='text-align: center;'>{matrix[i, j]:.2f}</td>"
+        html += "</tr>"
+    html += "</table>"
+    return html
+
+def _format_vector(self, vector):
+    """Форматирует вектор в виде HTML-таблицы."""
+    n = len(vector)
+    html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
+    html += "<tr>"
+    for i in range(n):
+        html += f"<td style='text-align: center;'>{vector[i]:.2f}</td>"
+    html += "</tr>"
+    html += "</table>"
+    return html
+
 class MatrixWindow(QWidget):
     """Окно для отображения матриц и векторов."""
     def __init__(self, matrices_text):
         super().__init__()
         self.setWindowTitle("Матрицы и векторы")
-        self.setGeometry(200, 200, 600, 700)
-        self.setStyleSheet("background-color: #1E1E1E; color: #FFFFFF;")
+        self.setGeometry(200, 200, 800, 800)  # Увеличили размер окна для удобства
+        self.setStyleSheet("""
+            background-color: #1E1E1E; 
+            color: #FFFFFF; 
+            border-radius: 15px;
+        """)
 
         # Текстовое поле для вывода матриц
         self.text_output = QTextEdit(self)
         self.text_output.setFont(QFont("Segoe UI", 12))
-        self.text_output.setStyleSheet("background-color: #2E2E2E; color: #FFFFFF; border: 1px solid #BBA9FF;")
+        self.text_output.setStyleSheet("""
+            background-color: #2E2E2E; 
+            color: #FFFFFF; 
+            border: 1px solid #BBA9FF; 
+            border-radius: 10px;
+            padding: 10px;
+        """)
         self.text_output.setReadOnly(True)
-        self.text_output.setPlainText(matrices_text)
+        self.text_output.setHtml(matrices_text)  # Используем HTML для форматирования
 
         # Основной макет
         layout = QVBoxLayout(self)
@@ -31,8 +64,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Анализ стратегий")
-        self.setGeometry(100, 100, 800, 950)
-        self.setStyleSheet("background-color: #1E1E1E; color: #FFFFFF;")
+        self.setGeometry(100, 100, 800, 800)  # Уменьшили высоту окна
+        self.setStyleSheet("""
+            background-color: #1E1E1E; 
+            color: #FFFFFF; 
+            border-radius: 15px;
+        """)
 
         # Словари для перевода текста кнопок в режимы
         self.matrix_mode_mapping = {
@@ -66,7 +103,13 @@ class MainWindow(QMainWindow):
         n_label.setFont(QFont("Segoe UI", 12))
         self.entry_n = QLineEdit()
         self.entry_n.setFont(QFont("Segoe UI", 12))
-        self.entry_n.setStyleSheet("background-color: #2E2E2E; color: #FFFFFF; border: 1px solid #BBA9FF;")
+        self.entry_n.setStyleSheet("""
+            background-color: #2E2E2E; 
+            color: #FFFFFF; 
+            border: 1px solid #BBA9FF; 
+            border-radius: 10px;
+            padding: 5px;
+        """)
         n_layout.addWidget(n_label)
         n_layout.addWidget(self.entry_n)
         input_layout.addLayout(n_layout)
@@ -121,23 +164,64 @@ class MainWindow(QMainWindow):
         # Кнопка запуска анализа
         self.run_button = QPushButton("Запустить анализ")
         self.run_button.setFont(QFont("Segoe UI", 12))
-        self.run_button.setStyleSheet("background-color: #A393EB; color: #FFFFFF; border: none; padding: 10px;")
+        self.run_button.setStyleSheet("""
+            background-color: #A393EB; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 10px; 
+            border-radius: 10px;
+        """)
         self.run_button.clicked.connect(self.run_analysis)
         main_layout.addWidget(self.run_button)
 
         # Кнопка для отображения матриц
         self.show_matrices_button = QPushButton("Показать матрицы")
         self.show_matrices_button.setFont(QFont("Segoe UI", 12))
-        self.show_matrices_button.setStyleSheet("background-color: #A393EB; color: #FFFFFF; border: none; padding: 10px;")
+        self.show_matrices_button.setStyleSheet("""
+            background-color: #A393EB; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 10px; 
+            border-radius: 10px;
+        """)
         self.show_matrices_button.clicked.connect(self.show_matrices)
         main_layout.addWidget(self.show_matrices_button)
 
         # Текстовое поле для вывода результатов
         self.text_output = QTextEdit()
         self.text_output.setFont(QFont("Segoe UI", 12))
-        self.text_output.setStyleSheet("background-color: #2E2E2E; color: #FFFFFF; border: 1px solid #BBA9FF;")
+        self.text_output.setStyleSheet("""
+            background-color: #2E2E2E; 
+            color: #FFFFFF; 
+            border: 1px solid #BBA9FF; 
+            border-radius: 10px;
+            padding: 10px;
+        """)
         self.text_output.setReadOnly(True)
         main_layout.addWidget(self.text_output)
+
+    def _format_matrix(self, matrix):
+        """Форматирует матрицу в виде HTML-таблицы."""
+        n = len(matrix)
+        html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
+        for i in range(n):
+            html += "<tr>"
+            for j in range(n):
+                html += f"<td style='text-align: center;'>{matrix[i, j]:.2f}</td>"
+            html += "</tr>"
+        html += "</table>"
+        return html
+
+    def _format_vector(self, vector):
+        """Форматирует вектор в виде HTML-таблицы."""
+        n = len(vector)
+        html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
+        html += "<tr>"
+        for i in range(n):
+            html += f"<td style='text-align: center;'>{vector[i]:.2f}</td>"
+        html += "</tr>"
+        html += "</table>"
+        return html
 
     def run_analysis(self):
         """Запуск анализа."""
@@ -200,24 +284,79 @@ class MainWindow(QMainWindow):
             loss_greedy_max = S3_hungarian - S1_max
             loss_greedy_random = S3_hungarian - S1_random
 
-            # Формирование строки для вывода
-            result_text = (
-                f"Жадная стратегия (назначения): {greedy_assignment}, S1 = {S1_greedy}, S2 = {S2_greedy}\n"
-                f"Минимальная стратегия (назначения): {min_assignment}, S1 = {S1_min}, S2 = {S2_min}, Потери = {loss_greedy_min}\n"
-                f"Максимальная стратегия (назначения): {max_assignment}, S1 = {S1_max}, S2 = {S2_max}, Потери = {loss_greedy_max}\n"
-                f"Случайная стратегия (назначения): {random_assignment}, S1 = {S1_random}, S2 = {S2_random}, Потери = {loss_greedy_random}\n"
-                f"Венгерский алгоритм (назначения): {hungarian_assignment}, S3 = {S3_hungarian}\n\n"
+            # Формирование строки для вывода с использованием HTML
+            result_text = """
+            <h2 style="color: #BBA9FF;">Результаты анализа:</h2>
+            <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
+                <tr>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">Стратегия</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">Назначения</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">S1</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">S2</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">Потери</th>
+                </tr>
+                <tr>
+                    <td>Жадная</td>
+                    <td>{}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>Минимальная</td>
+                    <td>{}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                </tr>
+                <tr>
+                    <td>Максимальная</td>
+                    <td>{}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                </tr>
+                <tr>
+                    <td>Случайная</td>
+                    <td>{}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                    <td>{:.2f}</td>
+                </tr>
+                <tr>
+                    <td>Венгерский алгоритм</td>
+                    <td>{}</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>{:.2f}</td>
+                </tr>
+            </table>
+            """.format(
+                greedy_assignment, S1_greedy, S2_greedy,
+                min_assignment, S1_min, S2_min, loss_greedy_min,
+                max_assignment, S1_max, S2_max, loss_greedy_max,
+                random_assignment, S1_random, S2_random, loss_greedy_random,
+                hungarian_assignment, S3_hungarian
             )
 
             # Вывод результатов в текстовое поле
-            self.text_output.setPlainText(result_text)
+            self.text_output.setHtml(result_text)
 
-            # Формирование строки для вывода матриц и векторов
-            self.matrices_text = (
-                f"Матрица C:\n{C}\n\n"
-                f"Вектор x:\n{x}\n\n"
-                f"Матрица D:\n{D}\n\n"
-                f"Матрица G с тильдой:\n{G_tilde}\n\n"
+            # Формирование HTML-строки для вывода матриц и векторов
+            self.matrices_text = """
+            <h2 style="color: #BBA9FF;">Матрица C:</h2>
+            {}
+            <h2 style="color: #BBA9FF;">Вектор x:</h2>
+            {}
+            <h2 style="color: #BBA9FF;">Матрица D:</h2>
+            {}
+            <h2 style="color: #BBA9FF;">Матрица G с тильдой:</h2>
+            {}
+            """.format(
+                self._format_matrix(C),  # Форматируем матрицу C
+                self._format_vector(x),  # Форматируем вектор x
+                self._format_matrix(D),  # Форматируем матрицу D
+                self._format_matrix(G_tilde)  # Форматируем матрицу G_tilde
             )
 
         except Exception as e:
