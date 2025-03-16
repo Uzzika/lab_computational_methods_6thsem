@@ -1,4 +1,6 @@
 import sys
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QRadioButton, QPushButton, QTextEdit, QButtonGroup, QMessageBox
@@ -34,7 +36,7 @@ class MatrixWindow(QWidget):
     def __init__(self, matrices_text):
         super().__init__()
         self.setWindowTitle("Матрицы и векторы")
-        self.setGeometry(200, 200, 800, 800)  # Увеличили размер окна для удобства
+        self.setGeometry(200, 200, 800, 800)
         self.setStyleSheet("""
             background-color: #1E1E1E; 
             color: #FFFFFF; 
@@ -52,7 +54,7 @@ class MatrixWindow(QWidget):
             padding: 10px;
         """)
         self.text_output.setReadOnly(True)
-        self.text_output.setHtml(matrices_text)  # Используем HTML для форматирования
+        self.text_output.setHtml(matrices_text)
 
         # Основной макет
         layout = QVBoxLayout(self)
@@ -64,7 +66,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Анализ стратегий")
-        self.setGeometry(100, 100, 800, 800)  # Уменьшили высоту окна
+        self.setGeometry(100, 100, 800, 800)
         self.setStyleSheet("""
             background-color: #1E1E1E; 
             color: #FFFFFF; 
@@ -187,6 +189,19 @@ class MainWindow(QMainWindow):
         self.show_matrices_button.clicked.connect(self.show_matrices)
         main_layout.addWidget(self.show_matrices_button)
 
+        # Кнопка для вывода графика потерь
+        self.plot_button = QPushButton("Показать график потерь")
+        self.plot_button.setFont(QFont("Segoe UI", 12))
+        self.plot_button.setStyleSheet("""
+            background-color: #A393EB; 
+            color: #FFFFFF; 
+            border: none; 
+            padding: 10px; 
+            border-radius: 10px;
+        """)
+        self.plot_button.clicked.connect(self.plot_losses)
+        main_layout.addWidget(self.plot_button)
+
         # Текстовое поле для вывода результатов
         self.text_output = QTextEdit()
         self.text_output.setFont(QFont("Segoe UI", 12))
@@ -257,14 +272,14 @@ class MainWindow(QMainWindow):
             S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
             # Оценка проигрыша жадной стратегии
-            loss_greedy_min = S3_hungarian - S1_min
-            loss_greedy_max = S3_hungarian - S1_max
-            loss_greedy_random = S3_hungarian - S1_random
+            self.loss_greedy_min = S3_hungarian - S1_min
+            self.loss_greedy_max = S3_hungarian - S1_max
+            self.loss_greedy_random = S3_hungarian - S1_random
 
             # Формирование строки для вывода с использованием HTML
             result_text = """
             <h2 style="color: #BBA9FF;">Результаты анализа:</h2>
-            <p style="color: #BBA9FF;">Потери рассчитываются как разница между прибылью, полученной с помощью венгерского алгоритма, и прибылью, полученной с помощью других стратегий.</p></p>
+            <p style="color: #BBA9FF;">Потери рассчитываются как разница между прибылью, полученной с помощью венгерского алгоритма, и прибылью, полученной с помощью других стратегий.</p>
             <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
                 <tr>
                     <th style="background-color: #2E2E2E; color: #FFFFFF;">Стратегия</th>
@@ -278,7 +293,7 @@ class MainWindow(QMainWindow):
                     <td>{}</td>
                     <td>{:.2f}</td>
                     <td>{:.2f}</td>
-                    <td>-</td>
+                    <td>{:.2f}</td>
                 </tr>
                 <tr>
                     <td>Минимальная</td>
@@ -310,10 +325,10 @@ class MainWindow(QMainWindow):
                 </tr>
             </table>
             """.format(
-                greedy_assignment, S1_greedy, S2_greedy,  # Назначения выводятся как список чисел
-                min_assignment, S1_min, S2_min, loss_greedy_min,
-                max_assignment, S1_max, S2_max, loss_greedy_max,
-                random_assignment, S1_random, S2_random, loss_greedy_random,
+                greedy_assignment, S1_greedy, S2_greedy, self.loss_greedy_min,
+                min_assignment, S1_min, S2_min, self.loss_greedy_min,
+                max_assignment, S1_max, S2_max, self.loss_greedy_max,
+                random_assignment, S1_random, S2_random, self.loss_greedy_random,
                 hungarian_assignment, S3_hungarian
             )
 
@@ -350,8 +365,73 @@ class MainWindow(QMainWindow):
         # Создание и отображение окна с матрицами
         self.matrix_window = MatrixWindow(self.matrices_text)
         self.matrix_window.show()
+    def plot_losses(self):
+        """Строит график потерь для всех стратегий."""
+        try:
+            # Проверяем, что анализ был запущен
+            if not hasattr(self, 'loss_greedy_min'):
+                QMessageBox.warning(self, "Ошибка", "Сначала запустите анализ.")
+                return
 
+            # Данные для графика
+            strategies = ["Жадная", "Минимальная", "Максимальная", "Случайная"]
+            losses = [
+                self.loss_greedy_min,  # Потери для жадной стратегии
+                self.loss_greedy_min,  # Потери для минимальной стратегии
+                self.loss_greedy_max,  # Потери для максимальной стратегии
+                self.loss_greedy_random  # Потери для случайной стратегии
+            ]
 
+            # Вычисляем диапазон данных
+            min_loss = min(losses)
+            max_loss = max(losses)
+            data_range = max_loss - min_loss
+
+            # Динамически вычисляем отступы (padding)
+            padding = data_range * 0.1  # 10% от диапазона данных
+
+            # Создаем график
+            fig, ax = plt.subplots()
+            bars = ax.bar(strategies, losses, color=['#A393EB', '#BBA9FF', '#8C6FE6', '#6F4FE6'])
+            ax.set_xlabel("Стратегии")
+            ax.set_ylabel("Потери")
+            ax.set_title("Потери стратегий относительно венгерского алгоритма")
+
+            # Добавляем ось X в середине графика
+            ax.axhline(0, color='black', linewidth=0.8)  # Ось X
+
+            # Устанавливаем динамические границы оси Y
+            ax.set_ylim(min_loss - padding, max_loss + padding)
+
+            # Добавляем значения потерь над/под столбцами
+            for bar in bars:
+                height = bar.get_height()
+                if height >= 0:
+                    ax.annotate(f'{height:.2f}',
+                                xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, 3),  # Смещение текста относительно столбца
+                                textcoords="offset points",
+                                ha='center', va='bottom')
+                else:
+                    ax.annotate(f'{height:.2f}',
+                                xy=(bar.get_x() + bar.get_width() / 2, height),
+                                xytext=(0, -10),  # Смещение текста относительно столбца
+                                textcoords="offset points",
+                                ha='center', va='top')
+
+            # Отображаем график в новом окне
+            self.plot_window = QWidget()
+            self.plot_window.setWindowTitle("График потерь")
+            self.plot_window.setGeometry(100, 100, 800, 600)
+            layout = QVBoxLayout()
+            canvas = FigureCanvas(fig)
+            layout.addWidget(canvas)
+            self.plot_window.setLayout(layout)
+            self.plot_window.show()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", str(e))
+            
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
