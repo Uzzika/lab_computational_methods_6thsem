@@ -3,7 +3,9 @@ import tkinter as tk
 from tkinter import font as tkFont
 from tkinter import ttk
 from scipy.optimize import linear_sum_assignment
+from PIL import Image, ImageTk  # Для работы с изображениями
 
+# Функции для работы с матрицами и стратегиями
 def generate_matrix(n, mode='random', row_mode='random', col_mode='random'):
     """Генерация матрицы C в зависимости от режима."""
     if mode == 'random':
@@ -108,6 +110,7 @@ def calculate_S3(G_tilde, assignment):
     S3 = sum(G_tilde[assignment[j], j] for j in range(n))
     return S3
 
+# Запуск анализа
 def run_analysis():
     """Запуск анализа."""
     n = int(entry_n.get())
@@ -172,63 +175,34 @@ def run_analysis():
     text_output.delete(1.0, tk.END)  # Очищаем текстовое поле перед выводом
     text_output.insert(tk.END, result_text)  # Вставляем текст в текстовое поле
 
-    # Выделяем жирным текст, который нужно выделить
-    text_output.tag_configure("bold", font=("Segoe UI", 12, "bold"))
-
-    # Используем метод index для корректных индексов
-    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Жадная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Жадная стратегия") + len("Жадная стратегия"))))
-    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Минимальная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Минимальная стратегия") + len("Минимальная стратегия"))))
-    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Максимальная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Максимальная стратегия") + len("Максимальная стратегия"))))
-    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Случайная стратегия")), text_output.index("1.0 + %dc" % (result_text.find("Случайная стратегия") + len("Случайная стратегия"))))
-    text_output.tag_add("bold", text_output.index("1.0 + %dc" % result_text.find("Венгерский алгоритм")), text_output.index("1.0 + %dc" % (result_text.find("Венгерский алгоритм") + len("Венгерский алгоритм"))))
-
 # Создание графического интерфейса
 root = tk.Tk()
 root.title("Анализ стратегий")
-root.geometry("800x950")  # Увеличили размер окна для удобства
-
-# Установка минимального размера окна
-root.minsize(600, 700)  # Минимальная ширина: 600, минимальная высота: 700
+root.geometry("800x950")
+root.configure(bg="#1E1E1E")  # Темный фон для корневого окна
 
 # Настройка шрифтов
 font_style = tkFont.Font(family="Segoe UI", size=12)  # Используем "Segoe UI"
 font_bold = tkFont.Font(family="Segoe UI", size=12, weight="bold")
 
-# Настройка отступов
 pad_x = 15
 pad_y = 10
 
-# Новая палитра цветов
-bg_color = "#27296D"  # Основной фон окна (темно-синий)
 btn_color = "#A393EB"  # Цвет кнопок (светло-фиолетовый)
 btn_hover_color = "#C6A9FF"  # Цвет кнопок при наведении (яркий сиреневый)
-text_bg_color = "#F5F5F5"  # Цвет фона текстового поля (очень светлый серый)
-text_color = "#333333"  # Цвет текста (темно-серый)
-frame_bg_color = "#5E63B6"  # Цвет фона фрейма ввода (средний синий)
+text_bg_color = "#2E2E2E"  # Темный фон текстового поля
+text_color = "#FFFFFF"  # Белый текст
+frame_bg_color = "#1E1E1E"  # Темный фон фрейма ввода
 border_color = "#BBA9FF"  # Цвет рамок и акцентов (мягкий сиреневый)
-highlight_color = "#D9CFFF"  # Дополнительный цвет для выделения (пастельный сиреневый)
-
-root.configure(bg=bg_color)  # Устанавливаем новый фон окна
-
-# Функция для изменения цвета кнопки при наведении
-def on_button_enter(event, button):
-    button.config(bg=btn_hover_color)
-
-def on_button_leave(event, button):
-    button.config(bg=btn_color)
 
 # Фрейм для ввода данных
-input_frame = ttk.Frame(root, padding=(10, 10), style="InputFrame.TFrame")
-input_frame.grid(row=0, column=0, columnspan=4, sticky="nsew", padx=20, pady=20)  # Добавляем отступы
+input_frame = ttk.Frame(root, padding=(10, 10))
+input_frame.grid(row=0, column=0, columnspan=4, sticky="nsew", padx=20, pady=20)
+input_frame.configure(style="InputFrame.TFrame")
 
 # Настройка стилей
 style = ttk.Style()
 style.configure("InputFrame.TFrame", background=frame_bg_color)
-
-# Настройка растягивания столбцов и строк внутри input_frame
-for i in range(4):
-    input_frame.columnconfigure(i, weight=1)  # Столбцы растягиваются равномерно
-input_frame.rowconfigure(4, weight=1)  # Последняя строка растягивается
 
 # Лейблы и элементы ввода
 tk.Label(input_frame, text="Размер матрицы (n):", font=font_style, bg=frame_bg_color, fg=text_color).grid(row=0, column=0, padx=pad_x, pady=pad_y, sticky="w")
@@ -257,13 +231,19 @@ tk.Radiobutton(input_frame, text="Случайные", variable=col_mode_var, va
 button = tk.Button(root, text="Запустить анализ", command=run_analysis, bg=btn_color, fg=text_color, font=font_style, relief="raised", bd=2)
 button.grid(row=4, column=0, columnspan=4, pady=pad_y, sticky="ew", padx=20)  # Центрируем кнопку
 
-# Наведение на кнопку для изменения цвета
-button.bind("<Enter>", lambda event, button=button: on_button_enter(event, button))
-button.bind("<Leave>", lambda event, button=button: on_button_leave(event, button))
-
 # Текстовое поле для вывода результатов
-text_output = tk.Text(root, height=30, width=80, font=font_style, bd=2, relief="sunken", wrap=tk.WORD, bg=text_bg_color, fg=text_color, highlightbackground=border_color)
-text_output.grid(row=5, column=0, columnspan=4, padx=20, pady=20, sticky="nsew")  # Центрируем текстовое поле
+text_output = tk.Text(
+    root, 
+    height=30, 
+    width=80, 
+    font=font_style, 
+    bd=2, 
+    relief="sunken", 
+    wrap=tk.WORD, 
+    bg=text_bg_color,  # Темный фон
+    fg=text_color      # Белый текст
+)
+text_output.grid(row=5, column=0, columnspan=4, padx=20, pady=20, sticky="nsew")
 
 # Добавление полосы прокрутки
 scrollbar = tk.Scrollbar(root, command=text_output.yview)
