@@ -60,9 +60,10 @@ def greedy_strategy(D):
             if i not in used and D[i, j] > best_value:
                 best_value = D[i, j]
                 best_i = i
-        assignment.append(best_i)
+        assignment.append(best_i)  # Просто добавляем число, без np.int64
         used.add(best_i)
     return assignment
+
 
 def hungarian_algorithm(G_tilde):
     """Венгерский алгоритм для матрицы G с тильдой."""
@@ -71,25 +72,25 @@ def hungarian_algorithm(G_tilde):
 
 def min_strategy(D):
     """Минимальная стратегия."""
-    return [np.argmin(D[:, j]) for j in range(len(D))]
+    return [int(np.argmin(D[:, j])) for j in range(len(D))]  # Возвращаем список чисел
 
 def max_strategy(D):
     """Максимальная стратегия."""
-    return [np.argmax(D[:, j]) for j in range(len(D))]
+    return [int(np.argmax(D[:, j])) for j in range(len(D))]  # Возвращаем список чисел
 
 def random_strategy(D):
     """Случайная стратегия."""
     n = len(D)
-    return [np.random.choice(n) for _ in range(n)]
+    return [int(np.random.choice(n)) for _ in range(n)]  # Возвращаем список чисел
 
 def calculate_S1(D, assignment, x, C, chi):
-    """Вычисление целевой функции S1."""
+    """Вычисление целевой функции S1 (Общая прибыль с учетом всех факторов)."""
     return sum(D[assignment[j], j] for j in range(len(D))) + sum(x[s] * C[s, j] for j in range(len(D)) for s in range(len(D)))
 
 def calculate_S2(D, assignment, x, C, chi):
-    """Вычисление целевой функции S2."""
+    """Вычисление целевой функции S2 (Прибыль от групп с обновленной защитой)."""
     return sum(D[assignment[j], j] for j in range(len(D)))
 
 def calculate_S3(G_tilde, assignment):
-    """Вычисление целевой функции S3."""
+    """Вычисление целевой функции S3 (Прибыль от групп с улучшенной защитой)."""
     return sum(G_tilde[assignment[j], j] for j in range(len(G_tilde)))

@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont
 from logic import *
 
-def _format_matrix(self, matrix):
+def _format_matrix(matrix):
     """Форматирует матрицу в виде HTML-таблицы."""
     n = len(matrix)
     html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
@@ -18,7 +18,7 @@ def _format_matrix(self, matrix):
     html += "</table>"
     return html
 
-def _format_vector(self, vector):
+def _format_vector(vector):
     """Форматирует вектор в виде HTML-таблицы."""
     n = len(vector)
     html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
@@ -73,9 +73,9 @@ class MainWindow(QMainWindow):
 
         # Словари для перевода текста кнопок в режимы
         self.matrix_mode_mapping = {
-            "Случайная": "random",
             "Возрастающая": "increasing",
-            "Убывающая": "decreasing"
+            "Убывающая": "decreasing",
+            "Случайная": "random"
         }
         self.row_col_mode_mapping = {
             "Возрастающие": "increasing",
@@ -121,7 +121,7 @@ class MainWindow(QMainWindow):
 
         self.matrix_mode_group = QButtonGroup()
         matrix_mode_layout = QHBoxLayout()
-        for text in ["Случайная", "Возрастающая", "Убывающая"]:
+        for text in ["Возрастающая", "Убывающая", "Случайная"]:
             radio = QRadioButton(text)
             radio.setFont(QFont("Segoe UI", 12))
             radio.setStyleSheet("color: #FFFFFF;")
@@ -200,29 +200,6 @@ class MainWindow(QMainWindow):
         self.text_output.setReadOnly(True)
         main_layout.addWidget(self.text_output)
 
-    def _format_matrix(self, matrix):
-        """Форматирует матрицу в виде HTML-таблицы."""
-        n = len(matrix)
-        html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
-        for i in range(n):
-            html += "<tr>"
-            for j in range(n):
-                html += f"<td style='text-align: center;'>{matrix[i, j]:.2f}</td>"
-            html += "</tr>"
-        html += "</table>"
-        return html
-
-    def _format_vector(self, vector):
-        """Форматирует вектор в виде HTML-таблицы."""
-        n = len(vector)
-        html = "<table border='1' cellpadding='5' cellspacing='0' style='border-collapse: collapse;'>"
-        html += "<tr>"
-        for i in range(n):
-            html += f"<td style='text-align: center;'>{vector[i]:.2f}</td>"
-        html += "</tr>"
-        html += "</table>"
-        return html
-
     def run_analysis(self):
         """Запуск анализа."""
         try:
@@ -287,12 +264,13 @@ class MainWindow(QMainWindow):
             # Формирование строки для вывода с использованием HTML
             result_text = """
             <h2 style="color: #BBA9FF;">Результаты анализа:</h2>
+            <p style="color: #BBA9FF;">Потери рассчитываются как разница между прибылью, полученной с помощью венгерского алгоритма, и прибылью, полученной с помощью других стратегий.</p></p>
             <table border="1" cellpadding="5" cellspacing="0" style="border-collapse: collapse; width: 100%;">
                 <tr>
                     <th style="background-color: #2E2E2E; color: #FFFFFF;">Стратегия</th>
                     <th style="background-color: #2E2E2E; color: #FFFFFF;">Назначения</th>
-                    <th style="background-color: #2E2E2E; color: #FFFFFF;">S1</th>
-                    <th style="background-color: #2E2E2E; color: #FFFFFF;">S2</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">Общая прибыль (S1)</th>
+                    <th style="background-color: #2E2E2E; color: #FFFFFF;">Прибыль от обновленной защиты (S2)</th>
                     <th style="background-color: #2E2E2E; color: #FFFFFF;">Потери</th>
                 </tr>
                 <tr>
@@ -332,7 +310,7 @@ class MainWindow(QMainWindow):
                 </tr>
             </table>
             """.format(
-                greedy_assignment, S1_greedy, S2_greedy,
+                greedy_assignment, S1_greedy, S2_greedy,  # Назначения выводятся как список чисел
                 min_assignment, S1_min, S2_min, loss_greedy_min,
                 max_assignment, S1_max, S2_max, loss_greedy_max,
                 random_assignment, S1_random, S2_random, loss_greedy_random,
@@ -353,10 +331,10 @@ class MainWindow(QMainWindow):
             <h2 style="color: #BBA9FF;">Матрица G с тильдой:</h2>
             {}
             """.format(
-                self._format_matrix(C),  # Форматируем матрицу C
-                self._format_vector(x),  # Форматируем вектор x
-                self._format_matrix(D),  # Форматируем матрицу D
-                self._format_matrix(G_tilde)  # Форматируем матрицу G_tilde
+                _format_matrix(C),  # Форматируем матрицу C
+                _format_vector(x),  # Форматируем вектор x
+                _format_matrix(D),  # Форматируем матрицу D
+                _format_matrix(G_tilde)  # Форматируем матрицу G_tilde
             )
 
         except Exception as e:
