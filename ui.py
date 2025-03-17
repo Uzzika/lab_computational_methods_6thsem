@@ -324,15 +324,15 @@ class MainWindow(QMainWindow):
             row_mode = self.row_col_mode_mapping[self.row_mode_group.checkedButton().text()]
             col_mode = self.row_col_mode_mapping[self.col_mode_group.checkedButton().text()]
 
-            # Генерация матрицы C и вектора x
-            C = generate_matrix(n, mode, row_mode, col_mode)
-            x = generate_x(n)
+            # Генерация матрицы C и вектора chi
+            C = generate_matrix(n, mode, row_mode, col_mode)  # Убедитесь, что C — двумерный массив
+            chi = generate_x(n)  # Убедитесь, что chi — одномерный массив
 
             # Вычисление матрицы D
-            D = calculate_D(C, x, x)
+            D = calculate_D(C, chi)  # Убедитесь, что D — двумерный массив
 
             # Вычисление матрицы G с тильдой
-            G_tilde = calculate_G_tilde(C, x, x)
+            G_tilde = calculate_G_tilde(C, chi)  # Убедитесь, что G_tilde — двумерный массив
 
             # Применение стратегий
             greedy_assignment = greedy_strategy(D)
@@ -342,22 +342,28 @@ class MainWindow(QMainWindow):
             random_assignment = random_strategy(D)
 
             # Вычисление целевых функций
-            S1_greedy = calculate_S1(D, greedy_assignment, x, C, x)
-            S1_min = calculate_S1(D, min_assignment, x, C, x)
-            S1_max = calculate_S1(D, max_assignment, x, C, x)
-            S1_random = calculate_S1(D, random_assignment, x, C, x)
+            S1_greedy = calculate_S1(D, greedy_assignment, chi, C)
+            S1_min = calculate_S1(D, min_assignment, chi, C)
+            S1_max = calculate_S1(D, max_assignment, chi, C)
+            S1_random = calculate_S1(D, random_assignment, chi, C)
 
-            S2_greedy = calculate_S2(D, greedy_assignment, x, C, x)
-            S2_min = calculate_S2(D, min_assignment, x, C, x)
-            S2_max = calculate_S2(D, max_assignment, x, C, x)
-            S2_random = calculate_S2(D, random_assignment, x, C, x)
+            S2_greedy = calculate_S2(D, greedy_assignment, chi, C)
+            S2_min = calculate_S2(D, min_assignment, chi, C)
+            S2_max = calculate_S2(D, max_assignment, chi, C)
+            S2_random = calculate_S2(D, random_assignment, chi, C)
 
             S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
-            # Оценка проигрыша жадной стратегии
-            self.loss_greedy_min = S3_hungarian - S1_min
-            self.loss_greedy_max = S3_hungarian - S1_max
-            self.loss_greedy_random = S3_hungarian - S1_random
+            # Потери
+            self.loss_greedy = S3_hungarian - S1_greedy
+            self.loss_min = S3_hungarian - S1_min
+            self.loss_max = S3_hungarian - S1_max
+            self.loss_random = S3_hungarian - S1_random
+
+            # Инициализация атрибутов для графика
+            self.loss_greedy_min = self.loss_greedy
+            self.loss_greedy_max = self.loss_max
+            self.loss_greedy_random = self.loss_random
 
             # Формирование строки для вывода с использованием HTML
             result_text = """
@@ -408,10 +414,10 @@ class MainWindow(QMainWindow):
                 </tr>
             </table>
             """.format(
-                greedy_assignment, S1_greedy, S2_greedy, self.loss_greedy_min,
-                min_assignment, S1_min, S2_min, self.loss_greedy_min,
-                max_assignment, S1_max, S2_max, self.loss_greedy_max,
-                random_assignment, S1_random, S2_random, self.loss_greedy_random,
+                greedy_assignment, S1_greedy, S2_greedy, self.loss_greedy,
+                min_assignment, S1_min, S2_min, self.loss_min,
+                max_assignment, S1_max, S2_max, self.loss_max,
+                random_assignment, S1_random, S2_random, self.loss_random,
                 hungarian_assignment, S3_hungarian
             )
 
@@ -430,7 +436,7 @@ class MainWindow(QMainWindow):
             {}
             """.format(
                 _format_matrix(C),  # Форматируем матрицу C
-                _format_vector(x),  # Форматируем вектор x
+                _format_vector(chi),  # Форматируем вектор chi
                 _format_matrix(D),  # Форматируем матрицу D
                 _format_matrix(G_tilde)  # Форматируем матрицу G_tilde
             )
@@ -461,7 +467,7 @@ class MainWindow(QMainWindow):
             strategies = ["Жадная", "Минимальная", "Максимальная", "Случайная"]
             losses = [
                 self.loss_greedy_min,  # Потери для жадной стратегии
-                self.loss_greedy_min,  # Потери для минимальной стратегии
+                self.loss_min,         # Потери для минимальной стратегии
                 self.loss_greedy_max,  # Потери для максимальной стратегии
                 self.loss_greedy_random  # Потери для случайной стратегии
             ]

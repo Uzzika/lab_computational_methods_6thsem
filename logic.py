@@ -30,7 +30,7 @@ def generate_x(n):
     """Генерация вектора x (случайные значения от 0 до 1)."""
     return np.random.rand(n)
 
-def calculate_D(C, x, chi):
+def calculate_D(C, chi):
     """Вычисление матрицы D."""
     n = len(C)
     D = np.zeros((n, n))
@@ -39,7 +39,7 @@ def calculate_D(C, x, chi):
             D[i, j] = sum((1 - chi[s]) * C[s, j] for s in range(j)) + (1 - chi[i]) * C[i, j] + sum(chi[s] * C[s, j] for s in range(n))
     return D
 
-def calculate_G_tilde(C, x, chi):
+def calculate_G_tilde(C, chi):
     """Вычисление матрицы G с тильдой."""
     n = len(C)
     G_tilde = np.zeros((n, n))
@@ -83,11 +83,11 @@ def random_strategy(D):
     n = len(D)
     return [int(np.random.choice(n)) for _ in range(n)]  # Возвращаем список чисел
 
-def calculate_S1(D, assignment, x, C, chi):
+def calculate_S1(D, assignment, chi, C):
     """Вычисление целевой функции S1 (Общая прибыль с учетом всех факторов)."""
-    return sum(D[assignment[j], j] for j in range(len(D))) + sum(x[s] * C[s, j] for j in range(len(D)) for s in range(len(D)))
+    return sum(D[assignment[j], j] for j in range(len(D))) + sum(chi[s] * C[s, j] for j in range(len(D)) for s in range(len(D)))
 
-def calculate_S2(D, assignment, x, C, chi):
+def calculate_S2(D, assignment, chi, C):
     """Вычисление целевой функции S2 (Прибыль от групп с обновленной защитой)."""
     return sum(D[assignment[j], j] for j in range(len(D)))
 
