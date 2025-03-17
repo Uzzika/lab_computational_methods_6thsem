@@ -325,14 +325,16 @@ class MainWindow(QMainWindow):
             col_mode = self.row_col_mode_mapping[self.col_mode_group.checkedButton().text()]
 
             # Генерация матрицы C и вектора chi
-            C = generate_matrix(n, mode, row_mode, col_mode)  # Убедитесь, что C — двумерный массив
-            chi = generate_x(n)  # Убедитесь, что chi — одномерный массив
+            C = generate_matrix(n, mode, row_mode, col_mode)
+            chi = generate_x(n)
 
             # Вычисление матрицы D
-            D = calculate_D(C, chi)  # Убедитесь, что D — двумерный массив
+            D = calculate_D(C, chi)
+            assert D.ndim == 2, "Матрица D должна быть двумерной"
 
             # Вычисление матрицы G с тильдой
-            G_tilde = calculate_G_tilde(C, chi)  # Убедитесь, что G_tilde — двумерный массив
+            G_tilde = calculate_G_tilde(C, chi)
+            assert G_tilde.ndim == 2, "Матрица G_tilde должна быть двумерной"
 
             # Применение стратегий
             greedy_assignment = greedy_strategy(D)
@@ -354,17 +356,16 @@ class MainWindow(QMainWindow):
 
             S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
-            # Потери
+            # Потери (убедитесь, что они положительные)
             self.loss_greedy = S3_hungarian - S1_greedy
             self.loss_min = S3_hungarian - S1_min
             self.loss_max = S3_hungarian - S1_max
             self.loss_random = S3_hungarian - S1_random
 
             # Инициализация атрибутов для графика
-            self.loss_greedy_min = self.loss_greedy
+            self.loss_greedy_min = self.loss_min
             self.loss_greedy_max = self.loss_max
             self.loss_greedy_random = self.loss_random
-
             # Формирование строки для вывода с использованием HTML
             result_text = """
             <h2 style="color: #BBA9FF;">Результаты анализа:</h2>
