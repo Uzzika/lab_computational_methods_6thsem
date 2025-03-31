@@ -588,29 +588,48 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             D = calculate_D(C, chi)
             G_tilde = calculate_G_tilde(C, chi)
 
-            assert G_tilde.ndim == 2, "Matrix G_tilde should be 2-dimensional"
-
-            greedy_assignment = greedy_strategy(G_tilde)
+            # Применение стратегий с валидацией
+            greedy_assignment = greedy_strategy(D)
+            validate_assignment(greedy_assignment, n)
+            
             hungarian_assignment = hungarian_algorithm(G_tilde)
+            validate_assignment(hungarian_assignment, n)
+            
             min_assignment = min_strategy(D)
+            validate_assignment(min_assignment, n)
+            
             max_assignment = max_strategy(D)
+            validate_assignment(max_assignment, n)
+            
             random_assignment = random_strategy(D)
+            validate_assignment(random_assignment, n)
 
+            # Вычисление целевых функций
             S1_greedy = calculate_S1(D, greedy_assignment, chi, C)
             S1_min = calculate_S1(D, min_assignment, chi, C)
             S1_max = calculate_S1(D, max_assignment, chi, C)
             S1_random = calculate_S1(D, random_assignment, chi, C)
-            S2_greedy = calculate_S2(G_tilde, greedy_assignment, chi, C)
-            S2_min = calculate_S2(G_tilde, min_assignment, chi, C)
-            S2_max = calculate_S2(G_tilde, max_assignment, chi, C)
-            S2_random = calculate_S2(G_tilde, random_assignment, chi, C)
+
+            # Расчет S2 для всех стратегий
+            S2_greedy = calculate_S2(calculate_D_tilde(C, greedy_assignment, chi), greedy_assignment, chi, C)
+            S2_min = calculate_S2(calculate_D_tilde(C, min_assignment, chi), min_assignment, chi, C)
+            S2_max = calculate_S2(calculate_D_tilde(C, max_assignment, chi), max_assignment, chi, C)
+            S2_random = calculate_S2(calculate_D_tilde(C, random_assignment, chi), random_assignment, chi, C)
+            
             S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
-            self.loss_greedy = ((S3_hungarian - S1_greedy) / S3_hungarian) * 100
-            self.loss_min = ((S3_hungarian - S1_min) / S3_hungarian) * 100
-            self.loss_max = ((S3_hungarian - S1_max) / S3_hungarian) * 100
-            self.loss_random = ((S3_hungarian - S1_random) / S3_hungarian) * 100
+            # Гарантированно неотрицательные потери
+            self.loss_greedy = S3_hungarian - S2_greedy
+            self.loss_min = S3_hungarian - S2_min
+            self.loss_max = S3_hungarian - S2_max
+            self.loss_random = S3_hungarian - S2_random
 
+            # print(f"Жадный алгоритм: {S1_greedy:.2f} (потери: {loss(S1_opt, S1_greedy):.2f}%)")
+            # print(f"Минимальная стратегия: {S1_min:.2f} (потери: {loss(S1_opt, S1_min):.2f}%)")
+            # print(f"Максимальная стратегия: {S1_max:.2f} (потери: {loss(S1_opt, S1_max):.2f}%)")
+            # print(f"Случайная стратегия: {S1_random:.2f} (потери: {loss(S1_opt, S1_random):.2f}%)")
+
+            # Инициализация атрибутов для графика
             self.loss_greedy_min = self.loss_min
             self.loss_greedy_max = self.loss_max
             self.loss_greedy_random = self.loss_random
