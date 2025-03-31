@@ -54,91 +54,69 @@ def calculate_D_tilde(C, assignment, chi):
 # Вычисление матрицы G_tilde
 def calculate_G_tilde(C, chi):
     n = len(C)
-    G_tilde = np.zeros((n, n))
+    G_tilde = np.zeros((n,n))
     for i in range(n):
         for j in range(n):
-            G_tilde[i, j] = sum((1 - chi[i]) * C[i, s] for s in range(j, n))
+            G_tilde[i,j] = sum((1-chi[i])*C[i,s] for s in range(j,n))
     return G_tilde
 
 # Жадная стратегия
-def greedy_strategy(D):
-    n = len(D)
-    assignment = []
+def greedy_strategy(G):
+    """Жадная стратегия (возвращает сумму и назначения)"""
+    n = len(G)
+    total = 0
     used = set()
+    assignments = []
+    
     for j in range(n):
-        best_i = -1
-        best_value = -np.inf
-        for i in range(n):
-            if i not in used and D[i, j] > best_value:
-                best_value = D[i, j]
-                best_i = i
-        assignment.append(best_i)
+        valid = [(i, G[i,j]) for i in range(n) if i not in used]
+        if not valid:  # если все уже использованы (не должно происходить)
+            valid = [(i, G[i,j]) for i in range(n) if i not in used]
+        best_i, best_val = max(valid, key=lambda x: x[1])
+        total += best_val
         used.add(best_i)
-    return assignment
+        assignments.append(best_i)
+    
+    return assignments
 
 # Венгерский алгоритм
-def hungarian_algorithm(G_tilde):
-    row_ind, col_ind = linear_sum_assignment(-G_tilde)
-    return col_ind.tolist()
+def hungarian_algorithm(G):
+    """Венгерский алгоритм для максимизации (возвращает сумму и назначения)"""
+    row_ind, col_ind = linear_sum_assignment(-G)
+    total = sum(G[row_ind[i], col_ind[i]] for i in range(len(row_ind)))
+    # Сортируем назначения по порядку столбцов
+    assignments = [0] * len(row_ind)
+    for i, j in zip(row_ind, col_ind):
+        assignments[j] = i
+    return assignments
 
 # Минимальная стратегия
-def min_strategy(D):
-    n = len(D)
-    assignment = []
+def min_strategy(G):
+    """Бережливая стратегия (возвращает сумму и назначения)"""
+    n = len(G)
+    total = 0
     used = set()
+    assignments = []
+    
     for j in range(n):
-        valid_indices = [i for i in range(n) if i not in used]
-        if not valid_indices:
-            remaining = list(set(range(n)) - used)
-            assignment.append(remaining[0] if remaining else 0)
-            used.add(remaining[0] if remaining else 0)
-        else:
-            best_i = valid_indices[np.argmin([D[i, j] for i in valid_indices])]
-            assignment.append(best_i)
-            used.add(best_i)
-    return assignment
-
-# Максимальная стратегия (исправленная)
-def max_strategy(D):
-    n = len(D)
-    assignment = []
-    used_rows = set()
-    used_cols = set()
+        valid = [(i, G[i,j]) for i in range(n) if i not in used]
+        if not valid:  # если все уже использованы (не должно происходить)
+            valid = [(i, G[i,j]) for i in range(n) if i not in used]
+        best_i, best_val = min(valid, key=lambda x: x[1])
+        total += best_val
+        used.add(best_i)
+        assignments.append(best_i)
     
-    # Создаем список всех элементов матрицы с их координатами
-    elements = []
-    for i in range(n):
-        for j in range(n):
-            elements.append((D[i, j], i, j))
-    
-    # Сортируем элементы по убыванию значения
-    elements.sort(reverse=True, key=lambda x: x[0])
-    
-    # Назначаем максимальные элементы, избегая повторных строк и столбцов
-    for val, i, j in elements:
-        if i not in used_rows and j not in used_cols:
-            assignment.append(i)
-            used_rows.add(i)
-            used_cols.add(j)
-            if len(assignment) == n:
-                break
-    
-    # Если не все назначения сделаны (маловероятно для квадратной матрицы)
-    while len(assignment) < n:
-        remaining = list(set(range(n)) - set(assignment))
-        assignment.append(remaining[0] if remaining else 0)
-    
-    return assignment
+    return assignments
 
 # Случайная стратегия
-def random_strategy(D):
-    n = len(D)
+def random_strategy(G):
+    n = len(G)
     assignment = []
     available = list(range(n))
     for j in range(n):
         if not available:
-            assignment.append(0)
-            continue
+            available = [i for i in range(n) if i not in assignment]
         chosen = np.random.choice(available)
         assignment.append(chosen)
         available.remove(chosen)
@@ -163,13 +141,8 @@ def calculate_S1(D, assignment, chi, C):
     return s1 + common_term
 
 # Вычисление S2
-def calculate_S2(D_tilde, assignment, chi, C):
-    n = len(D_tilde)
-    total = 0
-    for j in range(n):
-        if j < len(assignment):  # Защита от выхода за границы
-            total += D_tilde[assignment[j], j]
-    return total
+def calculate_S2(D_tilde, assignment):
+    return sum(D_tilde[assignment[j], j] for j in range(len(D_tilde)))
 
 # Вычисление S3
 def calculate_S3(G_tilde, assignment):
@@ -189,20 +162,17 @@ def analyze(n, mode='random', row_mode='random', col_mode='random'):
     greedy_assignment = greedy_strategy(D)
     hungarian_assignment = hungarian_algorithm(G_tilde)
     min_assignment = min_strategy(D)
-    max_assignment = max_strategy(D)
     random_assignment = random_strategy(D)
     
     # Вычисление целевых функций
-    S2_greedy = calculate_S2(calculate_D_tilde(C, greedy_assignment, chi), greedy_assignment, chi, C)
-    S2_min = calculate_S2(calculate_D_tilde(C, min_assignment, chi), min_assignment, chi, C)
-    S2_max = calculate_S2(calculate_D_tilde(C, max_assignment, chi), max_assignment, chi, C)
-    S2_random = calculate_S2(calculate_D_tilde(C, random_assignment, chi), random_assignment, chi, C)
+    S2_greedy = calculate_S2(calculate_D_tilde(C, greedy_assignment, chi), greedy_assignment)
+    S2_min = calculate_S2(calculate_D_tilde(C, min_assignment, chi), min_assignment)
+    S2_random = calculate_S2(calculate_D_tilde(C, random_assignment, chi), random_assignment)
     S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
     
     # Расчёт потерь
     loss_greedy = S3_hungarian - S2_greedy
     loss_min = S3_hungarian - S2_min
-    loss_max = S3_hungarian - S2_max
     loss_random = S3_hungarian - S2_random
     
     # Логирование
@@ -214,11 +184,10 @@ def analyze(n, mode='random', row_mode='random', col_mode='random'):
     print(D)
     print("\nМатрица G_tilde:")
     print(G_tilde)
-    print("\nЖадная стратегия:", greedy_assignment, "S1:", S2_greedy, "Потери:", loss_greedy)
-    print("Минимальная стратегия:", min_assignment, "S1:", S2_min, "Потери:", loss_min)
-    print("Максимальная стратегия:", max_assignment, "S1:", S2_max, "Потери:", loss_max)
-    print("Случайная стратегия:", random_assignment, "S1:", S2_random, "Потери:", loss_random)
+    print("\nЖадная стратегия:", greedy_assignment, "S2:", S2_greedy, "Потери:", loss_greedy)
+    print("Минимальная стратегия:", min_assignment, "S2:", S2_min, "Потери:", loss_min)
+    print("Случайная стратегия:", random_assignment, "S2:", S2_random, "Потери:", loss_random)
     print("Венгерский алгоритм:", hungarian_assignment, "S3:", S3_hungarian)
 
 # Пример использования
-analyze(n=5, mode='random', row_mode='random', col_mode='random')
+analyze(n=50, mode='random', row_mode='random', col_mode='random')
