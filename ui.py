@@ -177,7 +177,7 @@ class ResponsiveFontMixin:
             font.setPointSize(new_size)
             self.text_output.setFont(font)
 
-class MatrixWindow(QWidget, ResponsiveFontMixin):
+class MatrixWindow(QMainWindow, ResponsiveFontMixin):  # Изменено с QWidget на QMainWindow
     """Window for displaying matrices and vectors"""
     def __init__(self, matrices_text, dark_theme=True, parent=None):
         super().__init__(parent)
@@ -187,16 +187,24 @@ class MatrixWindow(QWidget, ResponsiveFontMixin):
         
         self.base_font_size = 12
         
-        self.text_output = QTextEdit(self)
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        
+        layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(10, 10, 10, 10)
+        
+        self.text_output = QTextEdit()
         self.text_output.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.text_output.setReadOnly(True)
         self.text_output.setHtml(matrices_text)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
         layout.addWidget(self.text_output)
-        self.setLayout(layout)
-
+        
+        # Добавляем возможность масштабирования
+        self.text_output.setLineWrapMode(QTextEdit.NoWrap)
+        self.text_output.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.text_output.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        
         self.apply_theme()
         
     def resizeEvent(self, event):
@@ -208,7 +216,6 @@ class MatrixWindow(QWidget, ResponsiveFontMixin):
             self.setStyleSheet("""
                 background-color: #1E1E1E; 
                 color: #FFFFFF; 
-                border-radius: 15px;
             """)
             self.text_output.setStyleSheet("""
                 background-color: #2E2E2E; 
@@ -221,7 +228,6 @@ class MatrixWindow(QWidget, ResponsiveFontMixin):
             self.setStyleSheet("""
                 background-color: #f7fbfc; 
                 color: #000000; 
-                border-radius: 15px;
             """)
             self.text_output.setStyleSheet("""
                 background-color: #ffffff; 
