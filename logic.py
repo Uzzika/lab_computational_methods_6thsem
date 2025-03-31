@@ -174,20 +174,3 @@ def analyze(n, mode='random', row_mode='random', col_mode='random'):
     loss_greedy = S3_hungarian - S2_greedy
     loss_min = S3_hungarian - S2_min
     loss_random = S3_hungarian - S2_random
-    
-    # Логирование
-    print("Матрица C:")
-    print(C)
-    print("\nВектор chi:")
-    print(chi)
-    print("\nМатрица D:")
-    print(D)
-    print("\nМатрица G_tilde:")
-    print(G_tilde)
-    print("\nЖадная стратегия:", greedy_assignment, "S2:", S2_greedy, "Потери:", loss_greedy)
-    print("Минимальная стратегия:", min_assignment, "S2:", S2_min, "Потери:", loss_min)
-    print("Случайная стратегия:", random_assignment, "S2:", S2_random, "Потери:", loss_random)
-    print("Венгерский алгоритм:", hungarian_assignment, "S3:", S3_hungarian)
-
-# Пример использования
-analyze(n=50, mode='random', row_mode='random', col_mode='random')
