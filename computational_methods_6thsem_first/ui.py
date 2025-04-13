@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QRadioButton, QPushButton, QTextEdit, QButtonGroup,
+    QLabel, QLineEdit, QRadioButton, QPushButton, QTextEdit, QButtonGroup, 
     QMessageBox, QSizePolicy
 )
 from PyQt5.QtGui import QFont
@@ -12,10 +12,8 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from logic import *
 
-
 class Translator:
     """Class to handle language translations with window-specific texts"""
-
     def __init__(self):
         self.translations = {
             'ru': {
@@ -116,12 +114,12 @@ class Translator:
             }
         }
         self.current_lang = 'ru'
-
+        
     def set_language(self, lang):
         """Set current language"""
         if lang in self.translations:
             self.current_lang = lang
-
+            
     def tr(self, category, key, format_args=None):
         """Get translation for key in specific category"""
         translation = self.translations[self.current_lang][category].get(key, key)
@@ -132,9 +130,7 @@ class Translator:
                 translation = translation.format(format_args)
         return translation
 
-
 translator = Translator()
-
 
 def _format_matrix(matrix):
     """Format matrix as HTML table"""
@@ -148,7 +144,6 @@ def _format_matrix(matrix):
     html += "</table>"
     return html
 
-
 def _format_vector(vector):
     """Format vector as HTML table"""
     n = len(vector)
@@ -160,62 +155,58 @@ def _format_vector(vector):
     html += "</table>"
     return html
 
-
 class ResponsiveFontMixin:
     """Mixin class to handle responsive font scaling"""
-
     def __init__(self):
         self.base_font_size = 12
         self.min_font_size = 8
         self.max_font_size = 24
-
+        
     def update_fonts(self, width):
         """Update font sizes based on container width"""
         scale_factor = min(max(width / 800, 0.8), 1.5)
         new_size = max(min(int(self.base_font_size * scale_factor), self.max_font_size), self.min_font_size)
-
+        
         for widget in self.findChildren((QLabel, QPushButton, QRadioButton, QLineEdit, QTextEdit)):
             font = widget.font()
             font.setPointSize(new_size)
             widget.setFont(font)
-
+            
         if hasattr(self, 'text_output'):
             font = self.text_output.font()
             font.setPointSize(new_size)
             self.text_output.setFont(font)
 
-
 class MatrixWindow(QMainWindow, ResponsiveFontMixin):  # Изменено с QWidget на QMainWindow
     """Window for displaying matrices and vectors"""
-
     def __init__(self, matrices_text, dark_theme=True, parent=None):
         super().__init__(parent)
         self.dark_theme = dark_theme
         self.setWindowTitle(translator.tr('matrix_window', 'title'))
         self.setMinimumSize(400, 400)
-
+        
         self.base_font_size = 12
-
+        
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
+        
         layout = QVBoxLayout(central_widget)
         layout.setContentsMargins(10, 10, 10, 10)
-
+        
         self.text_output = QTextEdit()
         self.text_output.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.text_output.setReadOnly(True)
         self.text_output.setHtml(matrices_text)
 
         layout.addWidget(self.text_output)
-
+        
         # Добавляем возможность масштабирования
         self.text_output.setLineWrapMode(QTextEdit.NoWrap)
         self.text_output.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.text_output.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
+        
         self.apply_theme()
-
+        
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.update_fonts(self.width())
@@ -250,24 +241,23 @@ class MatrixWindow(QMainWindow, ResponsiveFontMixin):  # Изменено с QWi
         """Update window title when language changes"""
         self.setWindowTitle(translator.tr('matrix_window', 'title'))
 
-
 class MainWindow(QMainWindow, ResponsiveFontMixin):
     def __init__(self):
         super().__init__()
         self.dark_theme = True
         self.setWindowTitle(translator.tr('main_window', 'title'))
         self.setMinimumSize(600, 600)
-
+        
         self.base_font_size = 12
-
+        
         # Initialize mode mappings with Russian text (will be updated when language changes)
         self.update_mode_mappings()
-
+        
         self.matrices_text = ""
         self.matrix_window = None
         self.plot_window = None
         self.initUI()
-
+        
     def update_mode_mappings(self):
         """Update mode mappings based on current language"""
         self.matrix_mode_mapping = {
@@ -280,7 +270,7 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             translator.tr('main_window', 'row_col_modes')[1]: "decreasing",
             translator.tr('main_window', 'row_col_modes')[2]: "random"
         }
-
+        
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.update_fonts(self.width())
@@ -289,25 +279,25 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
         central_widget = QWidget()
         central_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCentralWidget(central_widget)
-
+        
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(15)
 
         # Theme and language switcher
         top_buttons_layout = QHBoxLayout()
-
+        
         self.theme_button = QPushButton()
         self.theme_button.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self.theme_button.clicked.connect(self.toggle_theme)
         top_buttons_layout.addWidget(self.theme_button)
-
+        
         self.language_button = QPushButton("EN" if translator.current_lang == 'ru' else "RU")
         self.language_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
         self.language_button.setFixedWidth(50)
         self.language_button.clicked.connect(self.toggle_language)
         top_buttons_layout.addWidget(self.language_button)
-
+        
         main_layout.addLayout(top_buttons_layout)
 
         # Input frame
@@ -415,31 +405,36 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
         self.language_button.setText("EN" if new_lang == 'ru' else "RU")
         self.update_ui_text()
         self.update_mode_mappings()
-
+        
         # Update child windows if they exist
         if hasattr(self, 'matrix_window') and self.matrix_window:
             self.matrix_window.update_language()
-
+            
+        if hasattr(self, 'plot_window') and self.plot_window:
+            self.plot_losses()  # Recreate plot with new language
+            
+        # Update results text if it exists
+        if hasattr(self, 'matrices_text') and self.matrices_text:
+            self.run_analysis()  # Regenerate results with new language
+        
     def update_ui_text(self):
         """Update all UI text elements based on current language"""
         self.setWindowTitle(translator.tr('main_window', 'title'))
-        self.theme_button.setText(translator.tr('main_window', 'theme_button',
-                                                translator.tr('main_window',
-                                                              'light_theme' if self.dark_theme else 'dark_theme')))
-
+        self.theme_button.setText(translator.tr('main_window', 'theme_button', 
+            translator.tr('main_window', 'light_theme' if self.dark_theme else 'dark_theme')))
         self.n_label.setText(translator.tr('main_window', 'matrix_size'))
         self.matrix_mode_label.setText(translator.tr('main_window', 'matrix_mode'))
         self.row_mode_label.setText(translator.tr('main_window', 'row_mode'))
         self.col_mode_label.setText(translator.tr('main_window', 'col_mode'))
-
+        
         # Update radio buttons
         for i, text in enumerate(translator.tr('main_window', 'matrix_modes')):
             self.matrix_mode_buttons[i].setText(text)
-
+            
         for i, text in enumerate(translator.tr('main_window', 'row_col_modes')):
             self.row_mode_buttons[i].setText(text)
             self.col_mode_buttons[i].setText(text)
-
+            
         self.run_button.setText(translator.tr('main_window', 'run_analysis'))
         self.show_matrices_button.setText(translator.tr('main_window', 'show_matrices'))
         self.plot_button.setText(translator.tr('main_window', 'plot_losses'))
@@ -447,9 +442,8 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
     def toggle_theme(self):
         self.dark_theme = not self.dark_theme
         self.apply_theme()
-        self.theme_button.setText(translator.tr('main_window', 'theme_button',
-                                                translator.tr('main_window',
-                                                              'light_theme' if self.dark_theme else 'dark_theme')))
+        self.theme_button.setText(translator.tr('main_window', 'theme_button', 
+            translator.tr('main_window', 'light_theme' if self.dark_theme else 'dark_theme')))
 
     def apply_theme(self):
         if self.dark_theme:
@@ -584,7 +578,7 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
                 raise ValueError(translator.tr('messages', 'error_row_mode'))
             if not self.col_mode_group.checkedButton():
                 raise ValueError(translator.tr('messages', 'error_col_mode'))
-
+                
             mode = self.matrix_mode_mapping[self.matrix_mode_group.checkedButton().text()]
             row_mode = self.row_col_mode_mapping[self.row_mode_group.checkedButton().text()]
             col_mode = self.row_col_mode_mapping[self.col_mode_group.checkedButton().text()]
@@ -597,13 +591,13 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             # Применение стратегий с валидацией
             greedy_assignment = greedy_strategy(D)
             validate_assignment(greedy_assignment, n)
-
+            
             hungarian_assignment = hungarian_algorithm(G_tilde)
             validate_assignment(hungarian_assignment, n)
-
+            
             min_assignment = min_strategy(D)
             validate_assignment(min_assignment, n)
-
+            
             random_assignment = random_strategy(D)
             validate_assignment(random_assignment, n)
 
@@ -616,7 +610,7 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             S2_greedy = calculate_S2(calculate_D_tilde(C, greedy_assignment, chi), greedy_assignment)
             S2_min = calculate_S2(calculate_D_tilde(C, min_assignment, chi), min_assignment)
             S2_random = calculate_S2(calculate_D_tilde(C, random_assignment, chi), random_assignment)
-
+            
             S3_hungarian = calculate_S3(G_tilde, hungarian_assignment)
 
             # Гарантированно неотрицательные потери
@@ -624,9 +618,9 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             self.loss_min = S3_hungarian - S2_min
             self.loss_random = S3_hungarian - S2_random
 
-            # print(f"Жадный алгоритм: {S2_greedy:.2f} (потери: {loss(S3_hungarian, S2_greedy):.2f}%)")
-            # print(f"Минимальная стратегия: {S2_min:.2f} (потери: {loss(S3_hungarian, S2_min):.2f}%)")
-            # print(f"Случайная стратегия: {S2_random:.2f} (потери: {loss(S3_hungarian, S2_random):.2f}%)")
+            #print(f"Жадный алгоритм: {S2_greedy:.2f} (потери: {loss(S3_hungarian, S2_greedy):.2f}%)")
+            #print(f"Минимальная стратегия: {S2_min:.2f} (потери: {loss(S3_hungarian, S2_min):.2f}%)")
+            #print(f"Случайная стратегия: {S2_random:.2f} (потери: {loss(S3_hungarian, S2_random):.2f}%)")
 
             # Инициализация атрибутов для графика
             self.loss_greedy_min = self.loss_min
@@ -684,30 +678,29 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
 
     def show_matrices(self):
         if not self.matrices_text:
-            QMessageBox.warning(self,
-                                translator.tr('messages', 'warning_title'),
-                                translator.tr('messages', 'warning_analysis'))
+            QMessageBox.warning(self, 
+                translator.tr('messages', 'warning_title'), 
+                translator.tr('messages', 'warning_analysis'))
             return
 
         self.matrix_window = MatrixWindow(self.matrices_text, self.dark_theme, self)
         self.matrix_window.show()
 
     def plot_losses(self):
-        """Plot losses of strategies"""
         try:
             if not hasattr(self, 'loss_greedy'):
-                QMessageBox.warning(self,
-                                    translator.tr('messages', 'warning_title'),
-                                    translator.tr('messages', 'warning_analysis'))
+                QMessageBox.warning(self, 
+                    translator.tr('messages', 'warning_title'), 
+                    translator.tr('messages', 'warning_analysis'))
                 return
 
             # Используем только те стратегии, для которых есть данные о потерях
             strategies = [
                 translator.tr('main_window', 'strategies')[0],  # Жадная
                 translator.tr('main_window', 'strategies')[1],  # Минимальная
-                translator.tr('main_window', 'strategies')[3]  # Случайная
+                translator.tr('main_window', 'strategies')[3]   # Случайная
             ]
-
+            
             losses = [
                 self.loss_greedy,
                 self.loss_min,
@@ -764,19 +757,18 @@ class MainWindow(QMainWindow, ResponsiveFontMixin):
             self.plot_window = QWidget()
             self.plot_window.setWindowTitle(translator.tr('plot', 'title'))
             self.plot_window.setMinimumSize(600, 500)
-
+            
             layout = QVBoxLayout(self.plot_window)
             layout.setContentsMargins(10, 10, 10, 10)
-
+            
             canvas = FigureCanvas(fig)
             canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             layout.addWidget(canvas)
-
+            
             self.plot_window.show()
 
         except Exception as e:
             QMessageBox.critical(self, translator.tr('messages', 'error_title'), str(e))
-
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
