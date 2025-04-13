@@ -4,56 +4,97 @@ import time
 
 class FirepowerOptimizer:
     def __init__(self, C, k):
+        # Проверка входных данных
+        if not isinstance(C, list) or not all(isinstance(row, list) for row in C):
+            raise ValueError("Матрица должна быть списком списков")
+        if len(C) == 0 or any(len(row) != len(C) for row in C):
+            raise ValueError("Матрица должна быть квадратной")
+        if k <= 1:
+            raise ValueError("Коэффициент k должен быть больше 1")
+
         self.C = np.array(C, dtype=int)
-        self.k = k
+        self.k = float(k)
         self.n = len(C)
         self.M = 2 * self.C.max() + 1
         self.computation_time = 0
-        self.intermediate_results = []
 
     def optimize(self):
-        if self.n > 6:
-            raise ValueError("Размер матрицы слишком велик для данного алгоритма")
-
         try:
             start_time = time.time()
-            results = self._optimize_task3()
+            
+            # Проверка на отрицательные значения
+            if (self.C < 0).any():
+                raise ValueError("Матрица содержит отрицательные значения")
+
+            if self.n == 2:
+                # Специальная обработка для случая 2x2
+                results = self._solve_2x2_case()
+            else:
+                results = self._optimize_task3()
+            
             self.computation_time = time.time() - start_time
+            
+            # Проверка корректности расписания
+            schedule = results['schedule']
+            for j in range(self.n):
+                if len(schedule[j]) != 2 or schedule[j][0] == schedule[j][1]:
+                    raise RuntimeError("Некорректное расписание атак")
+            
             return results
             
         except Exception as e:
             raise RuntimeError(f"Ошибка оптимизации: {str(e)}")
 
+    def _solve_2x2_case(self):
+        """Специальное решение для матрицы 2x2"""
+        # Все возможные варианты расписания для 2x2
+        options = [
+            [[0, 1], [0, 1]],  # Оба стреляют по одним и тем же отрядам
+            [[0, 1], [1, 0]],   # Перекрестное расписание
+        ]
+        
+        best_power = float('inf')
+        best_schedule = None
+        
+        for schedule in options:
+            total = 0
+            for j in range(2):
+                for i in schedule[j]:
+                    if j > 0 and i in schedule[j-1]:
+                        # Если отряд уже атаковался в предыдущем периоде
+                        total += self.C[i, j] / self.k
+                    else:
+                        total += self.C[i, j]
+            
+            if total < best_power:
+                best_power = total
+                best_schedule = schedule
+        
+        return {
+            'schedule': best_schedule,
+            'total_power': float(best_power),
+            'initial_power': int(self.C.sum())
+        }
+
     def _optimize_task3(self):
-        """Задача 3/4: эффект на 1 период, 2 выстрела за период"""
+        """Оптимизация для матриц 3x3 и больше"""
         sigma_star, S6_sigma_star = self._find_optimal_permutation(self.C)
         sigma_0, S6_sigma_0 = self._find_conjugate_permutation(sigma_star)
         best_solution = self._find_best_solution(sigma_star, S6_sigma_star, sigma_0, S6_sigma_0)
         
-        self.intermediate_results.append({
-            'type': 'Задача 3/4',
-            'sigma*': sigma_star,
-            'S6(sigma*)': S6_sigma_star,
-            'sigma0': sigma_0,
-            'S6(sigma0)': S6_sigma_0,
-            'best_solution': best_solution
-        })
-        
         sigma1, sigma2 = best_solution['sigmas']
-        schedule = [[sigma1[j], sigma2[j]] for j in range(self.n)]
-        total_power = self.C.sum() - (self.k - 1) / self.k * best_solution['S']
+        schedule = [[int(sigma1[j]), int(sigma2[j])] for j in range(self.n)]
+        total_power = float(self.C.sum() - (self.k - 1) / self.k * best_solution['S'])
         
         return {
-        'schedule': schedule,
-        'total_power': float(total_power),
-        'initial_power': int(self.C.sum()),
-        'computation_time': self.computation_time,
-        'intermediate_results': self.intermediate_results
-    }
+            'schedule': schedule,
+            'total_power': total_power,
+            'initial_power': int(self.C.sum())
+        }
 
     def _find_optimal_permutation(self, matrix):
         row_ind, col_ind = linear_sum_assignment(-matrix)
-        sigma = col_ind.tolist()
+        sigma = col_ind[np.argsort(row_ind)].tolist()
         S = sum(matrix[sigma[j], j] for j in range(self.n))
         return sigma, S
 
@@ -62,7 +103,7 @@ class FirepowerOptimizer:
                     self.C + self.M,
                     0)
         row_ind, col_ind = linear_sum_assignment(-G)
-        conjugate_sigma = col_ind.tolist()
+        conjugate_sigma = col_ind[np.argsort(row_ind)].tolist()
         S = sum(self.C[conjugate_sigma[j], j] for j in range(self.n))
         return conjugate_sigma, S
 
@@ -74,7 +115,7 @@ class FirepowerOptimizer:
                             0))
         
         row_ind, col_ind = linear_sum_assignment(-G)
-        sigma_comp = col_ind.tolist()
+        sigma_comp = col_ind[np.argsort(row_ind)].tolist()
         S = sum(self.C[sigma_comp[j], j] for j in range(self.n))
         return sigma_comp, S
 
