@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оптимизатор боевой мощи (задачи 3 и 4)</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Оптимизация распределения боевой мощи (задачи 3 и 4)</h1>
+        
+        <div class="params-section">
+            <h2>Параметры задачи</h2>
+            <div class="form-group">
+                <label for="matrix-size">Размер матрицы (n):</label>
+                <select id="matrix-size" onchange="resizeMatrix()">
+                    <option value="2">2</option>
+                    <option value="3" selected>3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="k-value">Коэффициент k:</label>
+                <input type="number" id="k-value" min="2" max="10" value="2">
+            </div>
+            
+            <div class="form-group">
+                <label>Примеры:</label>
+                <select id="example-select" onchange="loadExample()">
+                    <option value="">Выберите пример...</option>
+                    {% for key, example in examples.items() %}
+                        <option value="{{ key }}">{{ example.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        
+        <div class="matrix-section">
+            <h2>Матрица мощности</h2>
+            <table id="matrix-table">
+                <!-- Матрица будет сгенерирована JavaScript -->
+            </table>
+            
+            <div class="buttons">
+                <button onclick="calculate()">Рассчитать</button>
+                <button onclick="clearMatrix()">Очистить</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="loading" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Выполняется расчет...</p>
+        </div>
+    </div>
+    
+    <script>
+        // Инициализация матрицы
+        function initMatrix() {
+            const size = parseInt(document.getElementById('matrix-size').value);
+            const table = document.getElementById('matrix-table');
+            table.innerHTML = '';
+            
+            // Заголовки столбцов
+            let headerRow = table.insertRow();
+            headerRow.insertCell(); // Пустая ячейка для угла
+            for (let j = 0; j < size; j++) {
+                const th = document.createElement('th');
+                th.textContent = `Пер. ${j+1}`;
+                headerRow.appendChild(th);
+            }
+            
+            // Строки матрицы
+            for (let i = 0; i < size; i++) {
+                const row = table.insertRow();
+                const th = document.createElement('th');
+                th.textContent = `Отр. ${i+1}`;
+                row.appendChild(th);
+                
+                for (let j = 0; j < size; j++) {
+                    const cell = row.insertCell();
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '1';
+                    input.value = '1';
+                    input.dataset.row = i;
+                    input.dataset.col = j;
+                    cell.appendChild(input);
+                }
+            }
+        }
+        
+        // Изменение размера матрицы
+        function resizeMatrix() {
+            initMatrix();
+        }
+        
+        // Очистка матрицы
+        function clearMatrix() {
+            const inputs = document.querySelectorAll('#matrix-table input');
+            inputs.forEach(input => {
+                input.value = '1';
+            });
+            document.getElementById('k-value').value = '2';
+            document.getElementById('example-select').value = '';
+        }
+        
+        // Загрузка примера
+        function loadExample() {
+            const exampleKey = document.getElementById('example-select').value;
+            if (!exampleKey) return;
+            
+            fetch('/static/examples.json')
+                .then(response => response.json())
+                .then(examples => {
+                    const example = examples[exampleKey];
+                    document.getElementById('matrix-size').value = example.matrix.length;
+                    document.getElementById('k-value').value = example.k;
+                    
+                    initMatrix();
+                    
+                    const inputs = document.querySelectorAll('#matrix-table input');
+                    example.matrix.forEach((row, i) => {
+                        row.forEach((val, j) => {
+                            const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
+                            if (input) input.value = val;
+                        });
+                    });
+                });
+        }
+        
+        // Расчет оптимизации
+        function calculate() {
+            const size = parseInt(document.getElementById('matrix-size').value);
+            const k = parseInt(document.getElementById('k-value').value);
+            
+            // Сбор данных матрицы с преобразованием в числа
+            const matrix = [];
+            for (let i = 0; i < size; i++) {
+                const row = [];
+                for (let j = 0; j < size; j++) {
+                    const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
+                    row.push(parseInt(input.value) || 1); // Значение по умолчанию 1
+                }
+                matrix.push(row);
+            }
+
+            // Показать индикатор загрузки
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('loading').innerHTML = `
+                <div class="loading-content">
+                    <div class="spinner"></div>
+                    <p>Выполняется расчет...</p>
+                </div>
+            `;
+
+            fetch('/calculate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    matrix: matrix,
+                    k: k
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showResults(data);
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            })
+            .catch(error => {
+                alert('Ошибка при выполнении запроса: ' + error);
+            })
+            .finally(() => {
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+        
+        // Показать результаты
+        function showResults(data) {
+            // Создаем новое окно с результатами
+            const resultsWindow = window.open('', '_blank');
+            
+            // HTML для результатов
+            const html = `
+                <!DOCTYPE html>
+                <html lang="ru">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Результаты оптимизации</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            margin: 20px;
+                            line-height: 1.6;
+                        }
+                        .result-section {
+                            margin-bottom: 30px;
+                        }
+                        .plot-container {
+                            margin: 20px 0;
+                        }
+                        table {
+                            border-collapse: collapse;
+                            margin: 20px 0;
+                        }
+                        th, td {
+                            border: 1px solid #ddd;
+                            padding: 8px;
+                            text-align: center;
+                        }
+                        th {
+                            background-color: #3498db;
+                            color: white;
+                        }
+                    </style>
+                    <script src="https://cdn.plot.ly/plotly-latest.min.js"><\/script>
+                </head>
+                <body>
+                    <h1>Результаты оптимизации (задачи 3 и 4)</h1>
+                    
+                    <div class="result-section">
+                        <h2>Основные результаты</h2>
+                        <p><strong>Размер матрицы:</strong> ${data.results.schedule.length}x${data.results.schedule.length}</p>
+                        <p><strong>Коэффициент k:</strong> ${document.getElementById('k-value').value}</p>
+                        <hr>
+                        <p><strong>Исходная мощность:</strong> ${data.results.initial_power}</p>
+                        <p><strong>Итоговая мощность:</strong> ${data.results.total_power.toFixed(2)}</p>
+                        <p><strong>Эффективность:</strong> ${(100 * (1 - data.results.total_power/data.results.initial_power)).toFixed(1)}%</p>
+                        <p><strong>Время расчета:</strong> ${data.results.computation_time.toFixed(3)} сек</p>
+                    </div>
+                    
+                    <div class="result-section">
+                        <h2>Оптимальное расписание (2 выстрела за период)</h2>
+                        <table>
+                            <tr>
+                                <th>Период</th>
+                                <th>Атакованные отряды</th>
+                            </tr>
+                            ${data.results.schedule.map((targets, j) => `
+                                <tr>
+                                    <td>${j+1}</td>
+                                    <td>${targets.map(t => t+1).join(' и ')}</td>
+                                </tr>
+                            `).join('')}
+                        </table>
+                    </div>
+                    
+                    <div class="result-section">
+                        <h2>Визуализация</h2>
+                        <div class="plot-container" id="matrix-plot"></div>
+                        <div class="plot-container" id="schedule-plot"></div>
+                    </div>
+                    
+                    <script>
+                        // Отображаем графики
+                        const matrixPlotData = ${data.matrix_plot};
+                        Plotly.newPlot('matrix-plot', matrixPlotData.data, matrixPlotData.layout);
+                        
+                        const schedulePlotData = ${data.schedule_plot};
+                        Plotly.newPlot('schedule-plot', schedulePlotData.data, schedulePlotData.layout);
+                    <\/script>
+                </body>
+                </html>
+            `;
+            
+            // Записываем HTML в новое окно
+            resultsWindow.document.open();
+            resultsWindow.document.write(html);
+            resultsWindow.document.close();
+        }
+        
+        // Инициализация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', initMatrix);
+    </script>
+</body>
+</html>
