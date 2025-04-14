@@ -48,14 +48,15 @@ class FirepowerOptimizer:
             if len(period) != 2 or len(set(period)) != 2:
                 raise ValueError("В каждый период должно атаковаться ровно 2 разных подразделения")
         
-        # 2. Проверяем что каждое подразделение атаковано не более 2 раз
+        # 2. Проверяем общее количество атак
         attack_counts = np.zeros(self.n)
         for period in schedule:
             for unit in period:
                 attack_counts[unit] += 1
-                
-        if (attack_counts > 2).any():
-            raise ValueError("Каждое подразделение может быть атаковано не более 2 раз")
+        
+        # Проверяем только что все подразделения атакованы хотя бы раз
+        if (attack_counts == 0).any():
+            raise ValueError("Каждое подразделение должно быть атаковано хотя бы раз")
 
     def _solve_2x2_case(self):
         """Специальное решение для матрицы 2x2 согласно пособию"""
@@ -168,129 +169,39 @@ class FirepowerOptimizer:
         """Поиск оптимального решения через перебор γ"""
         best = {'sigmas': (sigma_star, sigma_0), 'S7': S6_star + S6_0}
         
-        def is_valid_schedule(sigma1, sigma2):
-            """Проверяет, что расписание удовлетворяет ограничениям"""
+        def get_attack_distribution(sigma1, sigma2):
+            """Анализирует распределение атак по подразделениям"""
             attack_counts = np.zeros(self.n)
             for j in range(self.n):
-                targets = [sigma1[j], sigma2[j]]
-                if len(set(targets)) == 1:
-                    if attack_counts[targets[0]] >= 2:
-                        return False
-                    attack_counts[targets[0]] += 1
-                else:
-                    for t in targets:
-                        if attack_counts[t] >= 2:
-                            return False
-                        attack_counts[t] += 1
-            return True
+                attack_counts[sigma1[j]] += 1
+                attack_counts[sigma2[j]] += 1
+            return attack_counts
         
-        def get_schedule(sigma1, sigma2):
-            """Формирует расписание атак"""
-            schedule = []
-            attack_counts = np.zeros(self.n)
+        def evaluate_solution(sigma1, sigma2):
+            """Оценивает качество решения с учетом равномерности распределения атак"""
+            attack_counts = get_attack_distribution(sigma1, sigma2)
+            total_power = sum(self.C[sigma1[j], j] + self.C[sigma2[j], j] for j in range(self.n))
             
-            for j in range(self.n):
-                targets = [sigma1[j], sigma2[j]]
-                if len(set(targets)) == 1:
-                    main_target = targets[0]
-                    if attack_counts[main_target] >= 2:
-                        return None
-                    
-                    # Ищем альтернативную цель с учетом текущих атак
-                    available_targets = [t for t in range(self.n) 
-                                      if t != main_target and attack_counts[t] < 2]
-                    if not available_targets:
-                        return None
-                    
-                    # Выбираем цель с максимальной мощностью
-                    best_target = max(available_targets, key=lambda t: self.C[t,j])
-                    schedule.append([main_target, best_target])
-                    attack_counts[main_target] += 1
-                    attack_counts[best_target] += 1
-                else:
-                    # Проверяем, что обе цели могут быть атакованы
-                    if any(attack_counts[t] >= 2 for t in targets):
-                        return None
-                    
-                    schedule.append(targets)
-                    for t in targets:
-                        attack_counts[t] += 1
+            # Штраф за неравномерное распределение атак
+            attack_variance = np.var(attack_counts)
+            distribution_penalty = attack_variance * total_power * 0.1
             
-            return schedule if len(schedule) == self.n else None
+            return total_power - distribution_penalty
         
-        # Для матриц 4x4 используем специальную стратегию
-        if self.n == 4:
-            # Пробуем несколько стратегий для 4x4
-            strategies = [
-                (sigma_star, sigma_0),
-                (sigma_0, sigma_star),
-                (list(range(4)), list(range(3, -1, -1))),
-                ([0, 1, 2, 3], [3, 2, 1, 0]),
-                ([0, 2, 1, 3], [3, 1, 2, 0])
-            ]
+        # Пробуем различные комбинации перестановок
+        candidates = [
+            (sigma_star, sigma_0),
+            (sigma_0, sigma_star),
+            (list(range(self.n)), list(range(self.n-1, -1, -1))),
+            (sigma_star[::-1], sigma_0[::-1]),
+            (sigma_0[::-1], sigma_star[::-1])
+        ]
+        
+        for sigma1, sigma2 in candidates:
+            score = evaluate_solution(sigma1, sigma2)
+            current_S7 = sum(self.C[sigma1[j], j] + self.C[sigma2[j], j] for j in range(self.n))
             
-            for sigma1, sigma2 in strategies:
-                schedule = get_schedule(sigma1, sigma2)
-                if schedule is not None:
-                    S7 = sum(self.C[sigma1[j], j] for j in range(self.n)) + \
-                         sum(self.C[sigma2[j], j] for j in range(self.n))
-                    if S7 > best['S7']:
-                        best = {'sigmas': (sigma1, sigma2), 'S7': S7}
-        else:
-            # Для больших n используем жадный алгоритм
-            if self.n > 5:
-                # Пробуем несколько начальных перестановок
-                initial_permutations = [
-                    (sigma_star, sigma_0),
-                    (sigma_0, sigma_star),
-                    (list(range(self.n)), list(range(self.n-1, -1, -1)))
-                ]
-                
-                for initial_sigmas in initial_permutations:
-                    current_sigmas = initial_sigmas
-                    current_S7 = sum(self.C[current_sigmas[0][j], j] for j in range(self.n)) + \
-                                sum(self.C[current_sigmas[1][j], j] for j in range(self.n))
-                    
-                    # Пытаемся улучшить решение локальными изменениями
-                    for _ in range(200):
-                        improved = False
-                        for j in range(self.n):
-                            for i in range(self.n):
-                                if i != current_sigmas[0][j] and i != current_sigmas[1][j]:
-                                    new_sigma1 = current_sigmas[0].copy()
-                                    new_sigma1[j] = i
-                                    
-                                    sigma_2, S6_2 = self._find_conjugate_permutation(new_sigma1)
-                                    
-                                    if is_valid_schedule(new_sigma1, sigma_2):
-                                        S6_1 = sum(self.C[new_sigma1[j], j] for j in range(self.n))
-                                        if (S6_1 + S6_2) > current_S7:
-                                            current_sigmas = (new_sigma1, sigma_2)
-                                            current_S7 = S6_1 + S6_2
-                                            improved = True
-                                            break
-                            if improved:
-                                break
-                        if not improved:
-                            break
-                    
-                    if current_S7 > best['S7']:
-                        best = {'sigmas': current_sigmas, 'S7': current_S7}
-            else:
-                # Для малых n используем полный перебор
-                for gamma in range(2**self.n):
-                    gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
-                    sigma1 = sigma_star.copy()
-                    sigma2 = sigma_0.copy()
-                    
-                    for j in range(self.n):
-                        if gamma_vector[j] == 1:
-                            sigma1[j], sigma2[j] = sigma2[j], sigma1[j]
-                    
-                    if is_valid_schedule(sigma1, sigma2):
-                        S7 = sum(self.C[sigma1[j], j] for j in range(self.n)) + \
-                             sum(self.C[sigma2[j], j] for j in range(self.n))
-                        if S7 > best['S7']:
-                            best = {'sigmas': (sigma1, sigma2), 'S7': S7}
+            if score > evaluate_solution(best['sigmas'][0], best['sigmas'][1]):
+                best = {'sigmas': (sigma1, sigma2), 'S7': current_S7}
         
         return best

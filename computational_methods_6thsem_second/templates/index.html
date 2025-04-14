@@ -401,6 +401,47 @@
                 height: 250px;
             }
         }
+
+        /* Стили для выпадающего списка */
+        select.form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: var(--radius-sm);
+            background-color: white;
+            font-size: 14px;
+            color: var(--dark);
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        select.form-control:hover {
+            border-color: var(--primary-light);
+        }
+
+        select.form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(74, 137, 220, 0.1);
+            outline: none;
+        }
+
+        /* Стили для групп в выпадающем списке */
+        optgroup {
+            font-weight: 600;
+            color: var(--primary);
+            background-color: var(--light);
+            padding: 8px;
+        }
+
+        option {
+            padding: 8px;
+            color: var(--dark);
+            background-color: white;
+        }
+
+        option:hover {
+            background-color: var(--light);
+        }
     </style>
 </head>
 <body>
@@ -431,11 +472,28 @@
                 
                 <div class="form-group">
                     <label for="example-select">Примеры:</label>
-                    <select id="example-select" onchange="loadExample()">
+                    <select id="example-select" class="form-control" onchange="loadExample()">
                         <option value="">Выберите пример...</option>
-                        <option value="example1">Пример 1 (3x3)</option>
-                        <option value="example2">Пример 2 (4x4)</option>
-                        <option value="example3">Пример 3 (2x2)</option>
+                        <optgroup label="Матрицы 2x2">
+                            <option value="example2x2_1">Пример 1 (2x2) - Базовый</option>
+                            <option value="example2x2_2">Пример 2 (2x2) - Повышенная мощность</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 3x3">
+                            <option value="example3x3_1">Пример 3 (3x3) из пособия</option>
+                            <option value="example3x3_2">Пример 4 (3x3) - Асимметричный</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 4x4">
+                            <option value="example4x4_1">Пример 5 (4x4) - Симметричный</option>
+                            <option value="example4x4_2">Пример 6 (4x4) - Циклический</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 5x5">
+                            <option value="example5x5_1">Пример 7 (5x5) - Циклический</option>
+                            <option value="example5x5_2">Пример 8 (5x5) - Разные значения</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 6x6">
+                            <option value="example6x6_1">Пример 9 (6x6) - Сбалансированный</option>
+                            <option value="example6x6_2">Пример 10 (6x6) - Высокая мощность</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -589,17 +647,71 @@
         
         function loadExample() {
             const examples = {
-                'example1': {
+                'example2x2_1': {
+                    matrix: [[3, 6], [5, 2]],
+                    k: 2
+                },
+                'example2x2_2': {
+                    matrix: [[7, 4], [3, 8]],
+                    k: 3
+                },
+                'example3x3_1': {
                     matrix: [[5, 4, 2], [4, 5, 4], [2, 4, 5]],
                     k: 2
                 },
-                'example2': {
+                'example3x3_2': {
+                    matrix: [[6, 3, 5], [2, 7, 4], [4, 5, 3]],
+                    k: 2
+                },
+                'example4x4_1': {
                     matrix: [[3, 5, 2, 4], [4, 2, 5, 3], [5, 3, 4, 2], [2, 4, 3, 5]],
                     k: 3
                 },
-                'example3': {
-                    matrix: [[3, 6], [5, 2]],
+                'example4x4_2': {
+                    matrix: [[4, 2, 6, 3], [3, 4, 2, 6], [6, 3, 4, 2], [2, 6, 3, 4]],
                     k: 2
+                },
+                'example5x5_1': {
+                    matrix: [
+                        [4, 2, 5, 3, 1],
+                        [2, 5, 3, 1, 4],
+                        [5, 3, 1, 4, 2],
+                        [3, 1, 4, 2, 5],
+                        [1, 4, 2, 5, 3]
+                    ],
+                    k: 2
+                },
+                'example5x5_2': {
+                    matrix: [
+                        [6, 3, 4, 2, 5],
+                        [4, 5, 2, 6, 3],
+                        [2, 6, 5, 3, 4],
+                        [5, 2, 3, 4, 6],
+                        [3, 4, 6, 5, 2]
+                    ],
+                    k: 3
+                },
+                'example6x6_1': {
+                    matrix: [
+                        [5, 3, 4, 6, 2, 1],
+                        [2, 6, 3, 1, 5, 4],
+                        [4, 1, 5, 2, 3, 6],
+                        [3, 5, 1, 4, 6, 2],
+                        [6, 2, 4, 3, 1, 5],
+                        [1, 4, 6, 5, 2, 3]
+                    ],
+                    k: 2
+                },
+                'example6x6_2': {
+                    matrix: [
+                        [8, 4, 6, 3, 7, 5],
+                        [5, 7, 3, 8, 4, 6],
+                        [6, 3, 7, 5, 8, 4],
+                        [4, 8, 5, 6, 3, 7],
+                        [7, 5, 4, 8, 6, 3],
+                        [3, 6, 8, 4, 5, 7]
+                    ],
+                    k: 3
                 }
             };
             
@@ -607,17 +719,30 @@
             if (!exampleKey) return;
             
             const example = examples[exampleKey];
+            if (!example) {
+                console.error('Пример не найден:', exampleKey);
+                return;
+            }
+
+            // Обновляем размер матрицы и коэффициент k
             document.getElementById('matrix-size').value = example.matrix.length;
             document.getElementById('k-value').value = example.k;
             
+            // Пересоздаем матрицу с новым размером
             initMatrix();
             
+            // Заполняем значения из примера
             example.matrix.forEach((row, i) => {
                 row.forEach((val, j) => {
                     const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
-                    if (input) input.value = val;
+                    if (input) {
+                        input.value = val;
+                    }
                 });
             });
+
+            // Скрываем результаты при загрузке нового примера
+            document.getElementById('results-section').style.display = 'none';
         }
         
         function calculate() {
