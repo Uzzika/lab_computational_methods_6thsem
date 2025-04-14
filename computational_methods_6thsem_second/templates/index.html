@@ -245,15 +245,10 @@
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
             margin-bottom: 25px;
-        }
-
-        @media (max-width: 600px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
+            width: 100%;
         }
 
         .stat-card {
@@ -262,18 +257,65 @@
             padding: 20px;
             box-shadow: var(--shadow-sm);
             text-align: center;
+            min-width: 200px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .stat-value {
-            font-size: 2rem;
+            font-size: clamp(1.5rem, 4vw, 2rem);
             font-weight: 700;
             color: var(--primary);
             margin: 10px 0;
         }
 
         .stat-label {
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
             color: #777;
+            margin-bottom: 5px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: clamp(0.7rem, 1.5vw, 0.8rem);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .badge-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .badge-success {
+            background-color: var(--secondary);
+            color: white;
+        }
+
+        .badge-danger {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-card {
+                min-width: 100%;
+            }
         }
 
         .viz-container {
@@ -343,30 +385,6 @@
             100% { transform: rotate(360deg); }
         }
 
-        /* Badges */
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        .badge-primary {
-            background-color: var(--primary);
-            color: white;
-        }
-
-        .badge-success {
-            background-color: var(--secondary);
-            color: white;
-        }
-
-        .badge-danger {
-            background-color: var(--accent);
-            color: white;
-        }
-
         /* Добавляем стили для адаптивности результатов */
         @media (max-width: 1200px) {
             .main-content {
@@ -379,10 +397,6 @@
         }
 
         @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
             .plot-container {
                 height: 250px;
             }
@@ -464,9 +478,22 @@
                 <div class="viz-container">
                     <h3>Матрица боевой мощи</h3>
                     <div class="plot-container" id="matrix-plot"></div>
-                    
-                    <h3>Оптимальное расписание атак</h3>
-                    <div class="plot-container" id="schedule-plot"></div>
+                </div>
+
+                <h3>Анализ производительности</h3>
+                <div class="results-scroll-container">
+                    <table class="schedule-table" id="performance-table">
+                        <thead>
+                            <tr>
+                                <th>Размер матрицы (n)</th>
+                                <th>Время расчета (мс)</th>
+                                <th>Количество операций</th>
+                            </tr>
+                        </thead>
+                        <tbody id="performance-body">
+                            <!-- Данные будут добавлены через JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
 
                 <h3>Детализированный план атак</h3>
@@ -497,7 +524,7 @@
     
     <script>
         function updatePlotLayout() {
-            const plots = ['matrix-plot', 'schedule-plot'];
+            const plots = ['matrix-plot'];
             plots.forEach(id => {
                 Plotly.relayout(id, {
                     autosize: true,
@@ -557,6 +584,7 @@
             document.getElementById('k-value').value = '2';
             document.getElementById('example-select').value = '';
             document.getElementById('results-section').style.display = 'none';
+            document.getElementById('performance-body').innerHTML = '';
         }
         
         function loadExample() {
@@ -614,57 +642,78 @@
             document.getElementById('loading').style.display = 'flex';
             document.getElementById('results-section').style.display = 'none';
 
-            // Имитация отправки на сервер
-            setTimeout(() => {
-                const results = generateMockResults(matrix, k);
-                displayResults(results);
-                document.getElementById('loading').style.display = 'none';
-            }, 1000);
-        }
-        
-        function generateMockResults(matrix, k) {
-            const size = matrix.length;
-            const initialPower = matrix.flat().reduce((sum, val) => sum + val, 0);
-            
-            const schedule = [];
-            for (let j = 0; j < size; j++) {
-                const targets = [];
-                while (targets.length < 2) {
-                    const randomTarget = Math.floor(Math.random() * size);
-                    if (!targets.includes(randomTarget)) {
-                        targets.push(randomTarget);
-                    }
-                }
-                schedule.push(targets);
-            }
-            
-            let totalPower = initialPower;
-            schedule.forEach((targets, j) => {
-                targets.forEach(i => {
-                    totalPower -= matrix[i][j] * (1 - 1/k);
-                });
-            });
-            
-            return {
-                success: true,
-                results: {
-                    schedule: schedule,
-                    total_power: totalPower,
-                    initial_power: initialPower
+            // Отправляем запрос на сервер
+            fetch('/calculate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
                 },
-                k: k
-            };
+                body: JSON.stringify({
+                    matrix: matrix,
+                    k: k
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    alert('Ошибка при расчете: ' + data.error);
+                }
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при отправке запроса');
+                document.getElementById('loading').style.display = 'none';
+            });
         }
         
         function displayResults(data) {
             document.getElementById('initial-power').textContent = data.results.initial_power;
             document.getElementById('final-power').textContent = data.results.total_power.toFixed(2);
             
-            const efficiency = 100 * (1 - data.results.total_power / data.results.initial_power);
+            const efficiency = data.results.efficiency;
             document.getElementById('efficiency').textContent = efficiency.toFixed(1) + '%';
             
+            // Обновляем таблицу производительности
+            const performanceBody = document.getElementById('performance-body');
+            const newRow = document.createElement('tr');
+            
+            const sizeCell = document.createElement('td');
+            sizeCell.textContent = data.results.matrix_size;
+            newRow.appendChild(sizeCell);
+            
+            const timeCell = document.createElement('td');
+            timeCell.textContent = data.results.computation_time.toFixed(2);
+            newRow.appendChild(timeCell);
+            
+            const opsCell = document.createElement('td');
+            opsCell.textContent = Math.pow(2, data.results.matrix_size).toExponential(2);
+            newRow.appendChild(opsCell);
+            
+            performanceBody.appendChild(newRow);
+            
+            // Обновляем план атак
             const scheduleBody = document.getElementById('schedule-body');
             scheduleBody.innerHTML = '';
+            
+            // Создаем матрицу для подсчета количества атак по каждому подразделению в каждом периоде
+            const attackCounts = Array(data.results.matrix_size).fill().map(() => Array(data.results.matrix_size).fill(0));
+            data.results.schedule.forEach((targets, j) => {
+                targets.forEach(i => {
+                    attackCounts[i][j]++;
+                });
+            });
+            
+            // Создаем матрицу текущей мощности для каждого периода
+            const currentPowerMatrix = data.results.initial_power_matrix.map((row, i) => 
+                row.map((power, j) => {
+                    // Считаем количество атак до текущего периода включительно
+                    const attacksBefore = attackCounts[i].slice(0, j + 1).reduce((sum, count) => sum + count, 0);
+                    return power / Math.pow(data.k, attacksBefore);
+                })
+            );
             
             data.results.schedule.forEach((targets, j) => {
                 const row = document.createElement('tr');
@@ -678,40 +727,22 @@
                 row.appendChild(targetsCell);
                 
                 const effectCell = document.createElement('td');
-                effectCell.textContent = `Снижение на ${((data.k - 1) / data.k * 100).toFixed(0)}%`;
+                // Для каждого атакованного подразделения в этом периоде
+                const effects = targets.map(i => {
+                    const initialPower = data.results.initial_power_matrix[i][j];
+                    const currentPower = currentPowerMatrix[i][j];
+                    const reduction = ((initialPower - currentPower) / initialPower * 100).toFixed(1);
+                    return `Отр.${i+1}: -${reduction}% (${initialPower.toFixed(1)} → ${currentPower.toFixed(1)})`;
+                });
+                effectCell.textContent = effects.join(', ');
                 row.appendChild(effectCell);
                 
                 scheduleBody.appendChild(row);
             });
             
-            const scheduleMatrix = Array(data.results.schedule.length).fill().map(() => Array(data.results.schedule.length).fill(0));
-            data.results.schedule.forEach((targets, j) => {
-                targets.forEach(i => {
-                    scheduleMatrix[i][j] = 1;
-                });
-            });
-            
-            Plotly.newPlot('matrix-plot', [{
-                z: scheduleMatrix,
-                type: 'heatmap',
-                colorscale: [[0, 'white'], [1, 'red']],
-                showscale: false
-            }], {
-                title: 'Матрица боевой мощи',
-                xaxis: { title: 'Период' },
-                yaxis: { title: 'Отряд' }
-            });
-            
-            Plotly.newPlot('schedule-plot', [{
-                z: scheduleMatrix,
-                type: 'heatmap',
-                colorscale: [[0, 'white'], [1, 'red']],
-                showscale: false
-            }], {
-                title: 'Расписание атак',
-                xaxis: { title: 'Период' },
-                yaxis: { title: 'Отряд' }
-            });
+            // Обновляем графики
+            const matrixPlot = JSON.parse(data.visualizations.matrix_plot);
+            Plotly.newPlot('matrix-plot', matrixPlot.data, matrixPlot.layout);
             
             document.getElementById('results-section').style.display = 'block';
             updatePlotLayout();

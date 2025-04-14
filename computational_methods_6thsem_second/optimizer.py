@@ -14,7 +14,7 @@ class FirepowerOptimizer:
         if k <= 1:
             raise ValueError("Коэффициент k должен быть больше 1")
 
-        self.C = np.array(C, dtype=int)
+        self.C = np.array(C, dtype=float)
         self.k = float(k)
         self.n = len(C)
         self.M = 2 * self.C.max() + 1000  # Увеличиваем константу для большей надежности
@@ -63,7 +63,7 @@ class FirepowerOptimizer:
         schedule = [[0, 1], [0, 1]]  # Обе атаки в оба периода
         
         # Расчет суммарной мощности с учетом ослабления
-        total_power = 0
+        total_power = 0.0
         for j in range(2):
             for i in range(2):
                 if i in schedule[j]:
@@ -74,7 +74,7 @@ class FirepowerOptimizer:
         return {
             'schedule': schedule,
             'total_power': float(total_power),
-            'initial_power': int(self.C.sum()),
+            'initial_power': float(self.C.sum()),
             'computation_time': self.computation_time
         }
 
@@ -168,61 +168,129 @@ class FirepowerOptimizer:
         """Поиск оптимального решения через перебор γ"""
         best = {'sigmas': (sigma_star, sigma_0), 'S7': S6_star + S6_0}
         
-        # Для больших n используем жадный алгоритм с несколькими начальными точками
-        if self.n > 5:
-            # Пробуем несколько начальных перестановок
-            initial_permutations = [
+        def is_valid_schedule(sigma1, sigma2):
+            """Проверяет, что расписание удовлетворяет ограничениям"""
+            attack_counts = np.zeros(self.n)
+            for j in range(self.n):
+                targets = [sigma1[j], sigma2[j]]
+                if len(set(targets)) == 1:
+                    if attack_counts[targets[0]] >= 2:
+                        return False
+                    attack_counts[targets[0]] += 1
+                else:
+                    for t in targets:
+                        if attack_counts[t] >= 2:
+                            return False
+                        attack_counts[t] += 1
+            return True
+        
+        def get_schedule(sigma1, sigma2):
+            """Формирует расписание атак"""
+            schedule = []
+            attack_counts = np.zeros(self.n)
+            
+            for j in range(self.n):
+                targets = [sigma1[j], sigma2[j]]
+                if len(set(targets)) == 1:
+                    main_target = targets[0]
+                    if attack_counts[main_target] >= 2:
+                        return None
+                    
+                    # Ищем альтернативную цель с учетом текущих атак
+                    available_targets = [t for t in range(self.n) 
+                                      if t != main_target and attack_counts[t] < 2]
+                    if not available_targets:
+                        return None
+                    
+                    # Выбираем цель с максимальной мощностью
+                    best_target = max(available_targets, key=lambda t: self.C[t,j])
+                    schedule.append([main_target, best_target])
+                    attack_counts[main_target] += 1
+                    attack_counts[best_target] += 1
+                else:
+                    # Проверяем, что обе цели могут быть атакованы
+                    if any(attack_counts[t] >= 2 for t in targets):
+                        return None
+                    
+                    schedule.append(targets)
+                    for t in targets:
+                        attack_counts[t] += 1
+            
+            return schedule if len(schedule) == self.n else None
+        
+        # Для матриц 4x4 используем специальную стратегию
+        if self.n == 4:
+            # Пробуем несколько стратегий для 4x4
+            strategies = [
                 (sigma_star, sigma_0),
                 (sigma_0, sigma_star),
-                (list(range(self.n)), list(range(self.n-1, -1, -1)))
+                (list(range(4)), list(range(3, -1, -1))),
+                ([0, 1, 2, 3], [3, 2, 1, 0]),
+                ([0, 2, 1, 3], [3, 1, 2, 0])
             ]
             
-            for initial_sigmas in initial_permutations:
-                current_sigmas = initial_sigmas
-                current_S7 = sum(self.C[current_sigmas[0][j], j] for j in range(self.n)) + \
-                            sum(self.C[current_sigmas[1][j], j] for j in range(self.n))
-                
-                # Пытаемся улучшить решение локальными изменениями
-                for _ in range(200):  # Увеличиваем количество итераций
-                    improved = False
-                    for j in range(self.n):
-                        for i in range(self.n):
-                            if i != current_sigmas[0][j] and i != current_sigmas[1][j]:
-                                # Пробуем заменить элемент в первой перестановке
-                                new_sigma1 = current_sigmas[0].copy()
-                                new_sigma1[j] = i
-                                S6_1 = sum(self.C[new_sigma1[j], j] for j in range(self.n))
-                                
-                                # Находим сопряженную перестановку
-                                sigma_2, S6_2 = self._find_conjugate_permutation(new_sigma1)
-                                
-                                if (S6_1 + S6_2) > current_S7:
-                                    current_sigmas = (new_sigma1, sigma_2)
-                                    current_S7 = S6_1 + S6_2
-                                    improved = True
-                                    break
-                        if improved:
-                            break
-                    if not improved:
-                        break
-                
-                if current_S7 > best['S7']:
-                    best = {'sigmas': current_sigmas, 'S7': current_S7}
+            for sigma1, sigma2 in strategies:
+                schedule = get_schedule(sigma1, sigma2)
+                if schedule is not None:
+                    S7 = sum(self.C[sigma1[j], j] for j in range(self.n)) + \
+                         sum(self.C[sigma2[j], j] for j in range(self.n))
+                    if S7 > best['S7']:
+                        best = {'sigmas': (sigma1, sigma2), 'S7': S7}
         else:
-            # Для маленьких матриц используем полный перебор
-            for gamma in range(1, 2**self.n - 1):
-                gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
+            # Для больших n используем жадный алгоритм
+            if self.n > 5:
+                # Пробуем несколько начальных перестановок
+                initial_permutations = [
+                    (sigma_star, sigma_0),
+                    (sigma_0, sigma_star),
+                    (list(range(self.n)), list(range(self.n-1, -1, -1)))
+                ]
                 
-                # Находим дополнительную перестановку
-                sigma_1, S6_1 = self._find_complementary_permutation(sigma_star, gamma_vector)
-                
-                # Находим сопряженную к ней перестановку
-                sigma_2, S6_2 = self._find_conjugate_permutation(sigma_1)
-                
-                # Проверяем условие (41) - разные цели в каждый период
-                valid = all(sigma_1[j] != sigma_2[j] for j in range(self.n))
-                
-                if valid and (S6_1 + S6_2) > best['S7']:
-                    best = {'sigmas': (sigma_1, sigma_2), 'S7': S6_1 + S6_2}
+                for initial_sigmas in initial_permutations:
+                    current_sigmas = initial_sigmas
+                    current_S7 = sum(self.C[current_sigmas[0][j], j] for j in range(self.n)) + \
+                                sum(self.C[current_sigmas[1][j], j] for j in range(self.n))
+                    
+                    # Пытаемся улучшить решение локальными изменениями
+                    for _ in range(200):
+                        improved = False
+                        for j in range(self.n):
+                            for i in range(self.n):
+                                if i != current_sigmas[0][j] and i != current_sigmas[1][j]:
+                                    new_sigma1 = current_sigmas[0].copy()
+                                    new_sigma1[j] = i
+                                    
+                                    sigma_2, S6_2 = self._find_conjugate_permutation(new_sigma1)
+                                    
+                                    if is_valid_schedule(new_sigma1, sigma_2):
+                                        S6_1 = sum(self.C[new_sigma1[j], j] for j in range(self.n))
+                                        if (S6_1 + S6_2) > current_S7:
+                                            current_sigmas = (new_sigma1, sigma_2)
+                                            current_S7 = S6_1 + S6_2
+                                            improved = True
+                                            break
+                            if improved:
+                                break
+                        if not improved:
+                            break
+                    
+                    if current_S7 > best['S7']:
+                        best = {'sigmas': current_sigmas, 'S7': current_S7}
+            else:
+                # Для малых n используем полный перебор
+                for gamma in range(2**self.n):
+                    gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
+                    sigma1 = sigma_star.copy()
+                    sigma2 = sigma_0.copy()
+                    
+                    for j in range(self.n):
+                        if gamma_vector[j] == 1:
+                            sigma1[j], sigma2[j] = sigma2[j], sigma1[j]
+                    
+                    if is_valid_schedule(sigma1, sigma2):
+                        S7 = sum(self.C[sigma1[j], j] for j in range(self.n)) + \
+                             sum(self.C[sigma2[j], j] for j in range(self.n))
+                        if S7 > best['S7']:
+                            best = {'sigmas': (sigma1, sigma2), 'S7': S7}
         
         return best

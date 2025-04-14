@@ -38,13 +38,28 @@ def calculate():
     try:
         data = request.get_json()
         matrix = data['matrix']
-        k = int(data['k'])
+        k = float(data['k'])  # Конвертируем в float
+        
+        # Проверяем размер матрицы
+        if not matrix or any(len(row) != len(matrix) for row in matrix):
+            raise ValueError("Матрица должна быть квадратной")
+            
+        # Проверяем значения матрицы
+        for row in matrix:
+            for val in row:
+                if not isinstance(val, (int, float)) or val < 0:
+                    raise ValueError("Все значения матрицы должны быть неотрицательными числами")
         
         # Конвертируем в numpy массив
-        matrix = np.array(matrix, dtype=int)
+        matrix = np.array(matrix, dtype=float)
         
+        # Замеряем время выполнения
+        start_time = datetime.now()
         optimizer = FirepowerOptimizer(matrix.tolist(), k)
         results = optimizer.optimize()
+        end_time = datetime.now()
+        
+        computation_time = (end_time - start_time).total_seconds() * 1000  # в миллисекундах
         
         # Проверка для примера из пособия
         example_key = data.get('example_key')
@@ -54,26 +69,31 @@ def calculate():
                 app.logger.warning(f"Результат {results.get('S7')} не совпадает с ожидаемым {expected}")
         
         # Создаем визуализации
-        matrix_fig = create_matrix_plot(matrix, results['schedule'])
+        matrix_fig = create_matrix_plot(matrix, results['schedule'], k)
         schedule_fig = create_schedule_plot(results['schedule'])
         sigma_plot = create_sigma_plot(results.get('sigma1'), results.get('sigma2'))
         
-        return jsonify({
+        # Конвертируем результаты в Python native типы
+        response_data = {
             'success': True,
             'results': {
                 'schedule': results['schedule'],
-                'total_power': results['total_power'],
-                'initial_power': results['initial_power'],
-                'computation_time': results['computation_time'],
-                'efficiency': 100 * (1 - results['total_power'] / results['initial_power']),
-                'S7': results.get('S7', 0)
+                'total_power': float(results['total_power']),
+                'initial_power': float(results['initial_power']),
+                'computation_time': float(computation_time),
+                'efficiency': float(100 * (1 - results['total_power'] / results['initial_power'])),
+                'S7': float(results.get('S7', 0)),
+                'matrix_size': len(matrix),
+                'initial_power_matrix': matrix.tolist()
             },
             'visualizations': {
                 'matrix_plot': plotly.io.to_json(matrix_fig),
                 'schedule_plot': plotly.io.to_json(schedule_fig),
                 'sigma_plot': plotly.io.to_json(sigma_plot)
             }
-        })
+        }
+        
+        return jsonify(response_data)
     except Exception as e:
         app.logger.error(f"Ошибка расчета: {str(e)}")
         return jsonify({
@@ -81,7 +101,7 @@ def calculate():
             'error': str(e)
         })
 
-def create_matrix_plot(matrix, schedule):
+def create_matrix_plot(matrix, schedule, k):
     """Визуализация матрицы с выделением атакованных целей"""
     n = len(matrix)
     annotations = []
@@ -97,8 +117,6 @@ def create_matrix_plot(matrix, schedule):
     for j in range(n):
         for i in range(n):
             if attack_counts[i, j] > 0:
-                # Если подразделение атаковано, его мощность уменьшается в k раз
-                # Если атаковано дважды, мощность уменьшается в k раз для каждой атаки
                 display_matrix[i, j] = matrix[i, j] / (k ** attack_counts[i, j])
     
     # Создаем текст для подсказок
@@ -108,7 +126,8 @@ def create_matrix_plot(matrix, schedule):
         f"Текущая мощность: {display_matrix[i,j]:.1f}<br>" +
         f"Коэффициент ослабления: {k}<br>" +
         f"Количество атак: {int(attack_counts[i,j])}<br>" +
-        f"Финальный коэффициент ослабления: {k ** attack_counts[i,j]}"
+        f"Финальный коэффициент ослабления: {k ** attack_counts[i,j]:.1f}<br>" +
+        f"Процент ослабления: {100 * (1 - display_matrix[i,j]/matrix[i,j]):.1f}%"
         for j in range(n)] for i in range(n)]
     
     # Создаем цветовую шкалу для отображения мощности
@@ -139,7 +158,7 @@ def create_matrix_plot(matrix, schedule):
         showscale=True,
         colorbar=dict(
             title="Мощность",
-            titleside="right"
+            x=1.02
         )
     ))
     
@@ -218,7 +237,11 @@ def create_schedule_plot(schedule):
         f"{'Первая атака' if attack_matrix[i,j] == 1 else 'Вторая атака' if attack_matrix[i,j] == 2 else ''}"
         for j in range(n)] for i in range(n)]
     
-    fig = go.Figure(data=go.Heatmap(
+    # Создаем фигуру
+    fig = go.Figure()
+    
+    # Добавляем тепловую карту атак
+    fig.add_trace(go.Heatmap(
         z=attack_matrix,
         colorscale=[[0, 'white'], [0.5, 'lightcoral'], [1, 'red']],
         x=[f"Пер.{j+1}" for j in range(n)],
@@ -227,16 +250,53 @@ def create_schedule_plot(schedule):
         hovertext=hovertext,
         text=[["" if val == 0 else "1" if val == 1 else "2" for val in row] for row in attack_matrix],
         texttemplate="%{text}",
-        textfont={"size": 14, "color": "black"}
+        textfont={"size": 14, "color": "black"},
+        showscale=False
+    ))
+    
+    # Добавляем линии для разделения периодов
+    shapes = []
+    for i in range(n+1):
+        shapes.append(dict(
+            type="line",
+            x0=-0.5,
+            x1=n-0.5,
+            y0=i-0.5,
+            y1=i-0.5,
+            line=dict(color="black", width=1)
+        ))
+        shapes.append(dict(
+            type="line",
+            x0=i-0.5,
+            x1=i-0.5,
+            y0=-0.5,
+            y1=n-0.5,
+            line=dict(color="black", width=1)
+        ))
+    
+    # Добавляем рамки для выделения атакованных целей
+    for j in range(n):
+        for i in schedule[j]:
+            shapes.append(dict(
+                type="rect",
+                x0=j-0.5,
+                x1=j+0.5,
+                y0=i-0.5,
+                y1=i+0.5,
+                line=dict(color="red", width=2),
+                fillcolor="rgba(255,0,0,0.1)"
     ))
     
     fig.update_layout(
         title="Оптимальное расписание атак (1 - первая атака, 2 - вторая атака)",
         xaxis_title="Периоды времени",
         yaxis_title="Подразделения",
+        shapes=shapes,
         width=600,
         height=600,
-        margin=dict(l=60, r=30, t=80, b=60)
+        margin=dict(l=60, r=30, t=80, b=60),
+        plot_bgcolor='white',
+        paper_bgcolor='white'
     )
     
     return fig
@@ -249,24 +309,52 @@ def create_sigma_plot(sigma1, sigma2):
     n = len(sigma1)
     fig = go.Figure()
     
-    # Добавляем перестановку σ1
+    # Добавляем перестановку σ1 (первое расписание)
     fig.add_trace(go.Scatter(
         x=list(range(1, n+1)),
         y=[x+1 for x in sigma1],
-        mode='lines+markers',
+        mode='lines+markers+text',
         name='σ1 (первое расписание)',
         line=dict(color='blue', width=2),
-        marker=dict(size=10)
+        marker=dict(size=10, color='blue'),
+        text=[f"σ1({i+1})" for i in range(n)],
+        textposition="top center",
+        textfont=dict(size=12, color='blue')
     ))
     
-    # Добавляем перестановку σ2
+    # Добавляем перестановку σ2 (второе расписание)
     fig.add_trace(go.Scatter(
         x=list(range(1, n+1)),
         y=[x+1 for x in sigma2],
-        mode='lines+markers',
+        mode='lines+markers+text',
         name='σ2 (второе расписание)',
         line=dict(color='red', width=2),
-        marker=dict(size=10)
+        marker=dict(size=10, color='red'),
+        text=[f"σ2({i+1})" for i in range(n)],
+        textposition="bottom center",
+        textfont=dict(size=12, color='red')
+    ))
+    
+    # Добавляем точки пересечения
+    intersections = []
+    for i in range(n):
+        if sigma1[i] == sigma2[i]:
+            intersections.append({
+                'x': i+1,
+                'y': sigma1[i]+1,
+                'text': f"({i+1}, {sigma1[i]+1})"
+            })
+    
+    if intersections:
+        fig.add_trace(go.Scatter(
+            x=[p['x'] for p in intersections],
+            y=[p['y'] for p in intersections],
+            mode='markers+text',
+            name='Точки пересечения',
+            marker=dict(size=15, color='green', symbol='star'),
+            text=[p['text'] for p in intersections],
+            textposition="top center",
+            textfont=dict(size=12, color='green')
     ))
     
     fig.update_layout(
@@ -276,7 +364,21 @@ def create_sigma_plot(sigma1, sigma2):
         width=600,
         height=400,
         margin=dict(l=60, r=30, t=80, b=60),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        xaxis=dict(
+            tickmode='linear',
+            tick0=1,
+            dtick=1,
+            range=[0.5, n+0.5]
+        ),
+        yaxis=dict(
+            tickmode='linear',
+            tick0=1,
+            dtick=1,
+            range=[0.5, n+0.5]
+        )
     )
     
     return fig
