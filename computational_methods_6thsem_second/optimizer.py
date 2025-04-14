@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 import time
+import json
 
 class FirepowerOptimizer:
     def __init__(self, C, k):
@@ -15,39 +16,28 @@ class FirepowerOptimizer:
         self.C = np.array(C, dtype=int)
         self.k = float(k)
         self.n = len(C)
-        self.M = 2 * self.C.max() + 1
+        self.M = 2 * self.C.max() + 1  # Большая константа
         self.computation_time = 0
 
     def optimize(self):
         try:
             start_time = time.time()
             
-            # Проверка на отрицательные значения
             if (self.C < 0).any():
                 raise ValueError("Матрица содержит отрицательные значения")
 
             if self.n == 2:
-                # Специальная обработка для случая 2x2
-                results = self._solve_2x2_case()
+                return self._solve_2x2_case()
             else:
-                results = self._optimize_task3()
-            
-            self.computation_time = time.time() - start_time
-            
-            # Проверка корректности расписания
-            schedule = results['schedule']
-            for j in range(self.n):
-                if len(schedule[j]) != 2 or schedule[j][0] == schedule[j][1]:
-                    raise RuntimeError("Некорректное расписание атак")
-            
-            return results
-            
+                return self._optimize_task3()
+                
         except Exception as e:
             raise RuntimeError(f"Ошибка оптимизации: {str(e)}")
+        finally:
+            self.computation_time = time.time() - start_time
 
     def _solve_2x2_case(self):
         """Специальное решение для матрицы 2x2"""
-        # Все возможные варианты расписания для 2x2
         options = [
             [[0, 1], [0, 1]],  # Оба стреляют по одним и тем же отрядам
             [[0, 1], [1, 0]],   # Перекрестное расписание
@@ -60,11 +50,7 @@ class FirepowerOptimizer:
             total = 0
             for j in range(2):
                 for i in schedule[j]:
-                    if j > 0 and i in schedule[j-1]:
-                        # Если отряд уже атаковался в предыдущем периоде
-                        total += self.C[i, j] / self.k
-                    else:
-                        total += self.C[i, j]
+                    total += self.C[i, j] / (self.k if j > 0 and i in schedule[j-1] else 1)
             
             if total < best_power:
                 best_power = total
@@ -73,15 +59,22 @@ class FirepowerOptimizer:
         return {
             'schedule': best_schedule,
             'total_power': float(best_power),
-            'initial_power': int(self.C.sum())
+            'initial_power': int(self.C.sum()),
+            'computation_time': self.computation_time
         }
 
     def _optimize_task3(self):
-        """Оптимизация для матриц 3x3 и больше"""
+        """Оптимизация для матриц 3x3 и больше по алгоритму из пособия"""
+        # 1. Находим оптимальную перестановку σ*
         sigma_star, S6_sigma_star = self._find_optimal_permutation(self.C)
+        
+        # 2. Находим сопряженную перестановку σ0
         sigma_0, S6_sigma_0 = self._find_conjugate_permutation(sigma_star)
+        
+        # 3. Ищем лучшее решение
         best_solution = self._find_best_solution(sigma_star, S6_sigma_star, sigma_0, S6_sigma_0)
         
+        # 4. Формируем результаты
         sigma1, sigma2 = best_solution['sigmas']
         schedule = [[int(sigma1[j]), int(sigma2[j])] for j in range(self.n)]
         total_power = float(self.C.sum() - (self.k - 1) / self.k * best_solution['S'])
@@ -89,16 +82,19 @@ class FirepowerOptimizer:
         return {
             'schedule': schedule,
             'total_power': total_power,
-            'initial_power': int(self.C.sum())
+            'initial_power': int(self.C.sum()),
+            'computation_time': self.computation_time
         }
 
     def _find_optimal_permutation(self, matrix):
+        """Нахождение оптимальной перестановки σ* (задача о назначениях)"""
         row_ind, col_ind = linear_sum_assignment(-matrix)
         sigma = col_ind[np.argsort(row_ind)].tolist()
         S = sum(matrix[sigma[j], j] for j in range(self.n))
         return sigma, S
 
     def _find_conjugate_permutation(self, sigma):
+        """Нахождение сопряженной перестановки"""
         G = np.where(np.arange(self.n)[:, None] != np.array(sigma)[None, :],
                     self.C + self.M,
                     0)
@@ -108,6 +104,7 @@ class FirepowerOptimizer:
         return conjugate_sigma, S
 
     def _find_complementary_permutation(self, sigma, gamma_vector):
+        """Нахождение дополнительной перестановки"""
         G = np.where(np.arange(self.n)[:, None] != np.array(sigma)[None, :],
                     self.C + self.M,
                     np.where(np.array(gamma_vector)[None, :],
@@ -120,6 +117,7 @@ class FirepowerOptimizer:
         return sigma_comp, S
 
     def _find_best_solution(self, sigma_star, S_star, sigma_0, S0):
+        """Поиск лучшего решения через перебор γ"""
         best = {'sigmas': (sigma_star, sigma_0), 'S': S_star + S0}
         
         for gamma in range(1, 2**self.n - 1):
@@ -131,3 +129,12 @@ class FirepowerOptimizer:
                 best = {'sigmas': (sigma_1, sigma_2), 'S': S1 + S2}
         
         return best
+
+    def to_json(self):
+        """Сериализация объекта для передачи в веб-интерфейс"""
+        return json.dumps({
+            'C': self.C.tolist(),
+            'k': self.k,
+            'n': self.n,
+            'M': self.M
+        })

@@ -3,7 +3,7 @@ import numpy as np
 from optimizer import FirepowerOptimizer
 import plotly
 import plotly.graph_objects as go
-import time
+import json
 
 app = Flask(__name__)
 
@@ -14,7 +14,7 @@ EXAMPLES = {
         "k": 2
     },
     "example2": {
-        "name": "Пример 2 (4x4)",
+        "name": "Пример 2 (4x4)", 
         "matrix": [[3, 5, 2, 4], [4, 2, 5, 3], [5, 3, 4, 2], [2, 4, 3, 5]],
         "k": 3
     },
@@ -151,6 +151,6 @@ def create_schedule_plot(schedule):
     )
     
     return fig
-    
+
 if __name__ == '__main__':
     app.run(debug=True)
