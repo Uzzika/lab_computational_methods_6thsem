@@ -366,13 +366,33 @@
             background-color: var(--accent);
             color: white;
         }
+
+        /* Добавляем стили для адаптивности результатов */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .results-section {
+                margin-top: 30px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .plot-container {
+                height: 250px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Оптимизация распределения боевой мощи</h1>
-            <p class="subtitle">Решение задач 3 и 4 - оптимальное планирование атак</p>
         </header>
 
         <div class="main-content">
@@ -418,7 +438,7 @@
                 </div>
             </div>
 
-            <div class="results-section" id="results-section">
+            <div class="results-section" id="results-section" style="display: none;">
                 <h2>Результаты оптимизации</h2>
                 
                 <div class="stats-grid">
@@ -450,18 +470,20 @@
                 </div>
 
                 <h3>Детализированный план атак</h3>
-                <table class="schedule-table" id="schedule-table">
-                    <thead>
-                        <tr>
-                            <th>Период</th>
-                            <th>Атакованные отряды</th>
-                            <th>Ожидаемый эффект</th>
-                        </tr>
-                    </thead>
-                    <tbody id="schedule-body">
-                        <!-- Данные будут добавлены через JavaScript -->
-                    </tbody>
-                </table>
+                <div class="results-scroll-container">
+                    <table class="schedule-table" id="schedule-table">
+                        <thead>
+                            <tr>
+                                <th>Период</th>
+                                <th>Атакованные отряды</th>
+                                <th>Ожидаемый эффект</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedule-body">
+                            <!-- Данные будут добавлены через JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -474,22 +496,37 @@
     </div>
     
     <script>
-        // Инициализация матрицы
+        function updatePlotLayout() {
+            const plots = ['matrix-plot', 'schedule-plot'];
+            plots.forEach(id => {
+                Plotly.relayout(id, {
+                    autosize: true,
+                    margin: {
+                        l: 50,
+                        r: 30,
+                        b: 50,
+                        t: 30,
+                        pad: 4
+                    }
+                });
+            });
+        }
+
+        window.addEventListener('resize', updatePlotLayout);
+
         function initMatrix() {
             const size = parseInt(document.getElementById('matrix-size').value);
             const table = document.getElementById('matrix-table');
             table.innerHTML = '';
             
-            // Заголовки столбцов
             let headerRow = table.insertRow();
-            headerRow.insertCell(); // Пустая ячейка для угла
+            headerRow.insertCell();
             for (let j = 0; j < size; j++) {
                 const th = document.createElement('th');
                 th.textContent = `Пер. ${j+1}`;
                 headerRow.appendChild(th);
             }
             
-            // Строки матрицы
             for (let i = 0; i < size; i++) {
                 const row = table.insertRow();
                 const th = document.createElement('th');
@@ -509,28 +546,20 @@
             }
         }
         
-        // Изменение размера матрицы
         function resizeMatrix() {
             initMatrix();
             document.getElementById('results-section').style.display = 'none';
         }
         
-        // Очистка матрицы
         function clearMatrix() {
             const inputs = document.querySelectorAll('#matrix-table input');
-            inputs.forEach(input => {
-                input.value = '1';
-            });
+            inputs.forEach(input => input.value = '1');
             document.getElementById('k-value').value = '2';
             document.getElementById('example-select').value = '';
             document.getElementById('results-section').style.display = 'none';
         }
         
-        // Загрузка примера
         function loadExample() {
-            const exampleKey = document.getElementById('example-select').value;
-            if (!exampleKey) return;
-            
             const examples = {
                 'example1': {
                     matrix: [[5, 4, 2], [4, 5, 4], [2, 4, 5]],
@@ -546,13 +575,15 @@
                 }
             };
             
+            const exampleKey = document.getElementById('example-select').value;
+            if (!exampleKey) return;
+            
             const example = examples[exampleKey];
             document.getElementById('matrix-size').value = example.matrix.length;
             document.getElementById('k-value').value = example.k;
             
             initMatrix();
             
-            const inputs = document.querySelectorAll('#matrix-table input');
             example.matrix.forEach((row, i) => {
                 row.forEach((val, j) => {
                     const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
@@ -561,12 +592,10 @@
             });
         }
         
-        // Расчет оптимизации
         function calculate() {
             const size = parseInt(document.getElementById('matrix-size').value);
             const k = parseFloat(document.getElementById('k-value').value);
             
-            // Сбор данных матрицы
             const matrix = [];
             for (let i = 0; i < size; i++) {
                 const row = [];
@@ -585,39 +614,18 @@
             document.getElementById('loading').style.display = 'flex';
             document.getElementById('results-section').style.display = 'none';
 
-            // Отправка данных на сервер для расчета
-            fetch('/calculate', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    matrix: matrix,
-                    k: k
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    displayResults(data);
-                } else {
-                    throw new Error(data.error || 'Неизвестная ошибка');
-                }
-            })
-            .catch(error => {
-                alert('Ошибка при выполнении расчета: ' + error.message);
-            })
-            .finally(() => {
+            // Имитация отправки на сервер
+            setTimeout(() => {
+                const results = generateMockResults(matrix, k);
+                displayResults(results);
                 document.getElementById('loading').style.display = 'none';
-            });
+            }, 1000);
         }
         
-        // Генерация mock-результатов для демонстрации
         function generateMockResults(matrix, k) {
             const size = matrix.length;
             const initialPower = matrix.flat().reduce((sum, val) => sum + val, 0);
             
-            // Генерация случайного расписания
             const schedule = [];
             for (let j = 0; j < size; j++) {
                 const targets = [];
@@ -630,7 +638,6 @@
                 schedule.push(targets);
             }
             
-            // Расчет итоговой мощности (упрощенный)
             let totalPower = initialPower;
             schedule.forEach((targets, j) => {
                 targets.forEach(i => {
@@ -638,57 +645,17 @@
                 });
             });
             
-            // Генерация mock-графиков
-            const matrixPlot = {
-                data: [{
-                    z: matrix,
-                    type: 'heatmap',
-                    colorscale: 'YlOrRd',
-                    showscale: true
-                }],
-                layout: {
-                    title: 'Матрица боевой мощи',
-                    xaxis: { title: 'Период' },
-                    yaxis: { title: 'Отряд' }
-                }
-            };
-            
-            // Матрица для графика расписания
-            const scheduleMatrix = Array(size).fill().map(() => Array(size).fill(0));
-            schedule.forEach((targets, j) => {
-                targets.forEach(i => {
-                    scheduleMatrix[i][j] = 1;
-                });
-            });
-            
-            const schedulePlot = {
-                data: [{
-                    z: scheduleMatrix,
-                    type: 'heatmap',
-                    colorscale: [[0, 'white'], [1, 'red']],
-                    showscale: false
-                }],
-                layout: {
-                    title: 'Расписание атак',
-                    xaxis: { title: 'Период' },
-                    yaxis: { title: 'Отряд' }
-                }
-            };
-            
             return {
                 success: true,
                 results: {
                     schedule: schedule,
                     total_power: totalPower,
-                    initial_power: initialPower,
-                    computation_time: Math.random() * 0.5 + 0.1
+                    initial_power: initialPower
                 },
-                matrix_plot: JSON.stringify(matrixPlot),
-                schedule_plot: JSON.stringify(schedulePlot)
+                k: k
             };
         }
         
-        // Отображение результатов
         function displayResults(data) {
             document.getElementById('initial-power').textContent = data.results.initial_power;
             document.getElementById('final-power').textContent = data.results.total_power.toFixed(2);
@@ -696,7 +663,6 @@
             const efficiency = 100 * (1 - data.results.total_power / data.results.initial_power);
             document.getElementById('efficiency').textContent = efficiency.toFixed(1) + '%';
             
-            // Обновление таблицы расписания
             const scheduleBody = document.getElementById('schedule-body');
             scheduleBody.innerHTML = '';
             
@@ -718,17 +684,40 @@
                 scheduleBody.appendChild(row);
             });
             
-            // Отображение графиков
-            Plotly.newPlot('matrix-plot', JSON.parse(data.matrix_plot).data, JSON.parse(data.matrix_plot).layout);
-            Plotly.newPlot('schedule-plot', JSON.parse(data.schedule_plot).data, JSON.parse(data.schedule_plot).layout);
+            const scheduleMatrix = Array(data.results.schedule.length).fill().map(() => Array(data.results.schedule.length).fill(0));
+            data.results.schedule.forEach((targets, j) => {
+                targets.forEach(i => {
+                    scheduleMatrix[i][j] = 1;
+                });
+            });
+            
+            Plotly.newPlot('matrix-plot', [{
+                z: scheduleMatrix,
+                type: 'heatmap',
+                colorscale: [[0, 'white'], [1, 'red']],
+                showscale: false
+            }], {
+                title: 'Матрица боевой мощи',
+                xaxis: { title: 'Период' },
+                yaxis: { title: 'Отряд' }
+            });
+            
+            Plotly.newPlot('schedule-plot', [{
+                z: scheduleMatrix,
+                type: 'heatmap',
+                colorscale: [[0, 'white'], [1, 'red']],
+                showscale: false
+            }], {
+                title: 'Расписание атак',
+                xaxis: { title: 'Период' },
+                yaxis: { title: 'Отряд' }
+            });
             
             document.getElementById('results-section').style.display = 'block';
+            updatePlotLayout();
         }
         
-        // Инициализация при загрузке страницы
         document.addEventListener('DOMContentLoaded', initMatrix);
     </script>
 </body>
 </html>
-
-

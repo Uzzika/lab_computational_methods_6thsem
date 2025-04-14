@@ -2,6 +2,7 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 import time
 import json
+from itertools import combinations
 
 class FirepowerOptimizer:
     def __init__(self, C, k):
@@ -16,7 +17,7 @@ class FirepowerOptimizer:
         self.C = np.array(C, dtype=int)
         self.k = float(k)
         self.n = len(C)
-        self.M = 2 * self.C.max() + 1  # Большая константа
+        self.M = 2 * self.C.max() + 100  # Большая константа (увеличена)
         self.computation_time = 0
 
     def optimize(self):
@@ -27,114 +28,150 @@ class FirepowerOptimizer:
                 raise ValueError("Матрица содержит отрицательные значения")
 
             if self.n == 2:
-                return self._solve_2x2_case()
+                result = self._solve_2x2_case()
             else:
-                return self._optimize_task3()
+                result = self._optimize_task3()
+                
+            # Проверка ограничений задачи
+            self._validate_solution(result['schedule'])
+            return result
                 
         except Exception as e:
             raise RuntimeError(f"Ошибка оптимизации: {str(e)}")
         finally:
             self.computation_time = time.time() - start_time
 
+    def _validate_solution(self, schedule):
+        """Проверка что решение удовлетворяет условиям задачи"""
+        # 1. Проверяем что в каждый период атакуются ровно 2 разные цели
+        for period in schedule:
+            if len(period) != 2 or len(set(period)) != 2:
+                raise ValueError("В каждый период должно атаковаться ровно 2 разных подразделения")
+        
+        # 2. Проверяем что каждое подразделение атаковано не более 2 раз
+        attack_counts = np.zeros(self.n)
+        for period in schedule:
+            for unit in period:
+                attack_counts[unit] += 1
+                
+        if (attack_counts > 2).any():
+            raise ValueError("Каждое подразделение может быть атаковано не более 2 раз")
+
     def _solve_2x2_case(self):
-        """Специальное решение для матрицы 2x2"""
-        options = [
-            [[0, 1], [0, 1]],  # Оба стреляют по одним и тем же отрядам
-            [[0, 1], [1, 0]],   # Перекрестное расписание
-        ]
+        """Специальное решение для матрицы 2x2 согласно пособию"""
+        # Всего 2 периода и 2 подразделения, каждое должно быть атаковано 2 раза
+        schedule = [[0, 1], [0, 1]]  # Обе атаки в оба периода
         
-        best_power = float('inf')
-        best_schedule = None
-        
-        for schedule in options:
-            total = 0
-            for j in range(2):
-                for i in schedule[j]:
-                    total += self.C[i, j] / (self.k if j > 0 and i in schedule[j-1] else 1)
-            
-            if total < best_power:
-                best_power = total
-                best_schedule = schedule
+        # Расчет суммарной мощности с учетом ослабления
+        total_power = 0
+        for j in range(2):
+            for i in range(2):
+                if i in schedule[j]:
+                    total_power += self.C[i,j] / self.k
+                else:
+                    total_power += self.C[i,j]
         
         return {
-            'schedule': best_schedule,
-            'total_power': float(best_power),
+            'schedule': schedule,
+            'total_power': float(total_power),
             'initial_power': int(self.C.sum()),
             'computation_time': self.computation_time
         }
 
     def _optimize_task3(self):
-        """Оптимизация для матриц 3x3 и больше по алгоритму из пособия"""
-        # 1. Находим оптимальную перестановку σ*
+        """Основной алгоритм оптимизации для задачи 3 из пособия"""
+        # 1. Находим оптимальную перестановку σ* (максимизируем S6)
         sigma_star, S6_sigma_star = self._find_optimal_permutation(self.C)
         
         # 2. Находим сопряженную перестановку σ0
         sigma_0, S6_sigma_0 = self._find_conjugate_permutation(sigma_star)
         
-        # 3. Ищем лучшее решение
+        # 3. Ищем лучшее решение среди всех возможных γ
         best_solution = self._find_best_solution(sigma_star, S6_sigma_star, sigma_0, S6_sigma_0)
         
-        # 4. Формируем результаты
+        # 4. Формируем расписание атак
         sigma1, sigma2 = best_solution['sigmas']
         schedule = [[int(sigma1[j]), int(sigma2[j])] for j in range(self.n)]
-        total_power = float(self.C.sum() - (self.k - 1) / self.k * best_solution['S'])
+        
+        # 5. Рассчитываем итоговую мощность по формуле (42) из пособия
+        total_power = float(self.C.sum() - (self.k - 1) / self.k * best_solution['S7'])
         
         return {
             'schedule': schedule,
             'total_power': total_power,
             'initial_power': int(self.C.sum()),
-            'computation_time': self.computation_time
+            'computation_time': self.computation_time,
+            'sigma1': sigma1,
+            'sigma2': sigma2,
+            'S7': best_solution['S7']
         }
 
     def _find_optimal_permutation(self, matrix):
-        """Нахождение оптимальной перестановки σ* (задача о назначениях)"""
+        """Решение задачи о назначениях для максимизации S6"""
+        # Используем венгерский алгоритм через scipy
         row_ind, col_ind = linear_sum_assignment(-matrix)
         sigma = col_ind[np.argsort(row_ind)].tolist()
         S = sum(matrix[sigma[j], j] for j in range(self.n))
         return sigma, S
 
-    def _find_conjugate_permutation(self, sigma):
-        """Нахождение сопряженной перестановки"""
-        G = np.where(np.arange(self.n)[:, None] != np.array(sigma)[None, :],
-                    self.C + self.M,
-                    0)
-        row_ind, col_ind = linear_sum_assignment(-G)
-        conjugate_sigma = col_ind[np.argsort(row_ind)].tolist()
-        S = sum(self.C[conjugate_sigma[j], j] for j in range(self.n))
-        return conjugate_sigma, S
-
-    def _find_complementary_permutation(self, sigma, gamma_vector):
-        """Нахождение дополнительной перестановки"""
-        G = np.where(np.arange(self.n)[:, None] != np.array(sigma)[None, :],
-                    self.C + self.M,
-                    np.where(np.array(gamma_vector)[None, :],
-                            self.C + 2*self.M,
-                            0))
+    def _find_conjugate_permutation(self, base_sigma):
+        """Нахождение перестановки, сопряженной к base_sigma"""
+        # Создаем модифицированную матрицу G согласно формуле (55)
+        G = np.zeros((self.n, self.n))
+        for i in range(self.n):
+            for j in range(self.n):
+                if i != base_sigma[j]:
+                    G[i,j] = self.C[i,j] + self.M
+                else:
+                    G[i,j] = 0  # Запрещаем выбирать те же элементы
         
+        # Решаем задачу о назначениях для G
         row_ind, col_ind = linear_sum_assignment(-G)
-        sigma_comp = col_ind[np.argsort(row_ind)].tolist()
-        S = sum(self.C[sigma_comp[j], j] for j in range(self.n))
-        return sigma_comp, S
-
-    def _find_best_solution(self, sigma_star, S_star, sigma_0, S0):
-        """Поиск лучшего решения через перебор γ"""
-        best = {'sigmas': (sigma_star, sigma_0), 'S': S_star + S0}
+        sigma = col_ind[np.argsort(row_ind)].tolist()
+        S = sum(self.C[sigma[j], j] for j in range(self.n))
         
-        for gamma in range(1, 2**self.n - 1):
+        return sigma, S
+
+    def _find_complementary_permutation(self, base_sigma, gamma_vector):
+        """Нахождение дополнительной перестановки относительно γ"""
+        # Создаем модифицированную матрицу G согласно формуле (59)
+        G = np.zeros((self.n, self.n))
+        for i in range(self.n):
+            for j in range(self.n):
+                if i != base_sigma[j]:
+                    G[i,j] = self.C[i,j] + self.M
+                elif gamma_vector[j] == 1:
+                    G[i,j] = self.C[i,j] + 2*self.M  # Обязательно выбрать
+                else:
+                    G[i,j] = 0  # Запретить выбор
+        
+        # Решаем задачу о назначениях для G
+        row_ind, col_ind = linear_sum_assignment(-G)
+        sigma = col_ind[np.argsort(row_ind)].tolist()
+        S = sum(self.C[sigma[j], j] for j in range(self.n))
+        
+        return sigma, S
+
+    def _find_best_solution(self, sigma_star, S6_star, sigma_0, S6_0):
+        """Поиск оптимального решения через перебор γ"""
+        best = {'sigmas': (sigma_star, sigma_0), 'S7': S6_star + S6_0}
+        
+        # Для больших n ограничиваем перебор
+        max_iterations = 100 if self.n > 5 else 2**self.n - 1
+        
+        for gamma in range(1, max_iterations):
             gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
-            sigma_1, S1 = self._find_complementary_permutation(sigma_star, gamma_vector)
-            sigma_2, S2 = self._find_conjugate_permutation(sigma_1)
             
-            if S1 + S2 > best['S']:
-                best = {'sigmas': (sigma_1, sigma_2), 'S': S1 + S2}
+            # Находим дополнительную перестановку
+            sigma_1, S6_1 = self._find_complementary_permutation(sigma_star, gamma_vector)
+            
+            # Находим сопряженную к ней перестановку
+            sigma_2, S6_2 = self._find_conjugate_permutation(sigma_1)
+            
+            # Проверяем условие (41) - разные цели в каждый период
+            valid = all(sigma_1[j] != sigma_2[j] for j in range(self.n))
+            
+            if valid and (S6_1 + S6_2) > best['S7']:
+                best = {'sigmas': (sigma_1, sigma_2), 'S7': S6_1 + S6_2}
         
         return best
-
-    def to_json(self):
-        """Сериализация объекта для передачи в веб-интерфейс"""
-        return json.dumps({
-            'C': self.C.tolist(),
-            'k': self.k,
-            'n': self.n,
-            'M': self.M
-        })

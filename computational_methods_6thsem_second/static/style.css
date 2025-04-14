@@ -1,4 +1,57 @@
-/* Results Section - Premium Design */
+/* Контейнеры с прокруткой */
+.matrix-scroll-container {
+    max-width: 100%;
+    overflow-x: auto;
+    margin-bottom: 20px;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Фиксированные заголовки */
+.fixed-header {
+    position: sticky;
+    top: 0;
+    background-color: var(--primary);
+    color: white;
+    z-index: 10;
+}
+
+/* Фиксированный первый столбец */
+.fixed-first-column {
+    position: sticky;
+    left: 0;
+    background-color: var(--white);
+    z-index: 5;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+}
+
+/* Адаптивные таблицы */
+.responsive-table {
+    width: 100%;
+    min-width: 600px; /* Минимальная ширина таблицы */
+}
+
+/* Контейнер для результатов с прокруткой */
+.results-scroll-container {
+    max-height: 600px;
+    overflow-y: auto;
+    margin-top: 20px;
+    border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+    .matrix-scroll-container {
+        font-size: 0.9rem;
+    }
+    
+    .matrix-table th, 
+    .matrix-table td {
+        padding: 8px;
+        min-width: 40px;
+    }
+}
+
+/* Results Section */
 .results-section {
     background: linear-gradient(135deg, #f8fafc 0%, #f0f7fb 100%);
     border-radius: 24px;
