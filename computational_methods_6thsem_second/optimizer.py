@@ -17,7 +17,7 @@ class FirepowerOptimizer:
         self.C = np.array(C, dtype=int)
         self.k = float(k)
         self.n = len(C)
-        self.M = 2 * self.C.max() + 100  # Большая константа (увеличена)
+        self.M = 2 * self.C.max() + 1000  # Увеличиваем константу для большей надежности
         self.computation_time = 0
 
     def optimize(self):
@@ -89,9 +89,21 @@ class FirepowerOptimizer:
         # 3. Ищем лучшее решение среди всех возможных γ
         best_solution = self._find_best_solution(sigma_star, S6_sigma_star, sigma_0, S6_sigma_0)
         
-        # 4. Формируем расписание атак
+        # 4. Формируем расписание атак с проверкой корректности
         sigma1, sigma2 = best_solution['sigmas']
-        schedule = [[int(sigma1[j]), int(sigma2[j])] for j in range(self.n)]
+        schedule = []
+        for j in range(self.n):
+            if sigma1[j] == sigma2[j]:
+                # Если в периоде j обе перестановки указывают на одну цель,
+                # ищем альтернативную цель для второй атаки
+                available_targets = [i for i in range(self.n) if i != sigma1[j]]
+                if not available_targets:
+                    raise ValueError("Невозможно сформировать корректное расписание атак")
+                # Выбираем цель с максимальной мощностью
+                best_target = max(available_targets, key=lambda i: self.C[i,j])
+                schedule.append([int(sigma1[j]), int(best_target)])
+            else:
+                schedule.append([int(sigma1[j]), int(sigma2[j])])
         
         # 5. Рассчитываем итоговую мощность по формуле (42) из пособия
         total_power = float(self.C.sum() - (self.k - 1) / self.k * best_solution['S7'])
@@ -156,22 +168,61 @@ class FirepowerOptimizer:
         """Поиск оптимального решения через перебор γ"""
         best = {'sigmas': (sigma_star, sigma_0), 'S7': S6_star + S6_0}
         
-        # Для больших n ограничиваем перебор
-        max_iterations = 100 if self.n > 5 else 2**self.n - 1
-        
-        for gamma in range(1, max_iterations):
-            gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
+        # Для больших n используем жадный алгоритм с несколькими начальными точками
+        if self.n > 5:
+            # Пробуем несколько начальных перестановок
+            initial_permutations = [
+                (sigma_star, sigma_0),
+                (sigma_0, sigma_star),
+                (list(range(self.n)), list(range(self.n-1, -1, -1)))
+            ]
             
-            # Находим дополнительную перестановку
-            sigma_1, S6_1 = self._find_complementary_permutation(sigma_star, gamma_vector)
-            
-            # Находим сопряженную к ней перестановку
-            sigma_2, S6_2 = self._find_conjugate_permutation(sigma_1)
-            
-            # Проверяем условие (41) - разные цели в каждый период
-            valid = all(sigma_1[j] != sigma_2[j] for j in range(self.n))
-            
-            if valid and (S6_1 + S6_2) > best['S7']:
-                best = {'sigmas': (sigma_1, sigma_2), 'S7': S6_1 + S6_2}
+            for initial_sigmas in initial_permutations:
+                current_sigmas = initial_sigmas
+                current_S7 = sum(self.C[current_sigmas[0][j], j] for j in range(self.n)) + \
+                            sum(self.C[current_sigmas[1][j], j] for j in range(self.n))
+                
+                # Пытаемся улучшить решение локальными изменениями
+                for _ in range(200):  # Увеличиваем количество итераций
+                    improved = False
+                    for j in range(self.n):
+                        for i in range(self.n):
+                            if i != current_sigmas[0][j] and i != current_sigmas[1][j]:
+                                # Пробуем заменить элемент в первой перестановке
+                                new_sigma1 = current_sigmas[0].copy()
+                                new_sigma1[j] = i
+                                S6_1 = sum(self.C[new_sigma1[j], j] for j in range(self.n))
+                                
+                                # Находим сопряженную перестановку
+                                sigma_2, S6_2 = self._find_conjugate_permutation(new_sigma1)
+                                
+                                if (S6_1 + S6_2) > current_S7:
+                                    current_sigmas = (new_sigma1, sigma_2)
+                                    current_S7 = S6_1 + S6_2
+                                    improved = True
+                                    break
+                        if improved:
+                            break
+                    if not improved:
+                        break
+                
+                if current_S7 > best['S7']:
+                    best = {'sigmas': current_sigmas, 'S7': current_S7}
+        else:
+            # Для маленьких матриц используем полный перебор
+            for gamma in range(1, 2**self.n - 1):
+                gamma_vector = [int(b) for b in f"{gamma:0{self.n}b}"]
+                
+                # Находим дополнительную перестановку
+                sigma_1, S6_1 = self._find_complementary_permutation(sigma_star, gamma_vector)
+                
+                # Находим сопряженную к ней перестановку
+                sigma_2, S6_2 = self._find_conjugate_permutation(sigma_1)
+                
+                # Проверяем условие (41) - разные цели в каждый период
+                valid = all(sigma_1[j] != sigma_2[j] for j in range(self.n))
+                
+                if valid and (S6_1 + S6_2) > best['S7']:
+                    best = {'sigmas': (sigma_1, sigma_2), 'S7': S6_1 + S6_2}
         
         return best

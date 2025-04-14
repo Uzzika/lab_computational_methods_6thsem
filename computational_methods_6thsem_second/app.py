@@ -85,7 +85,6 @@ def create_matrix_plot(matrix, schedule):
     """Визуализация матрицы с выделением атакованных целей"""
     n = len(matrix)
     annotations = []
-    shapes = []
     
     # Подсчитываем количество атак по каждому подразделению
     attack_counts = np.zeros((n, n))
@@ -93,21 +92,55 @@ def create_matrix_plot(matrix, schedule):
         for i in targets:
             attack_counts[i, j] += 1
     
+    # Создаем матрицу для отображения с учетом ослабления атакованных целей
+    display_matrix = matrix.copy()
+    for j in range(n):
+        for i in range(n):
+            if attack_counts[i, j] > 0:
+                # Если подразделение атаковано, его мощность уменьшается в k раз
+                # Если атаковано дважды, мощность уменьшается в k раз для каждой атаки
+                display_matrix[i, j] = matrix[i, j] / (k ** attack_counts[i, j])
+    
     # Создаем текст для подсказок
     hovertext = [[
-        f"Отр.{i+1} Пер.{j+1}<br>Мощность: {matrix[i,j]}<br>" +
-        f"Атак: {int(attack_counts[i,j])}/{2 if i in schedule[j] else 0}"
+        f"Отр.{i+1} Пер.{j+1}<br>" +
+        f"Исходная мощность: {matrix[i,j]}<br>" +
+        f"Текущая мощность: {display_matrix[i,j]:.1f}<br>" +
+        f"Коэффициент ослабления: {k}<br>" +
+        f"Количество атак: {int(attack_counts[i,j])}<br>" +
+        f"Финальный коэффициент ослабления: {k ** attack_counts[i,j]}"
         for j in range(n)] for i in range(n)]
     
-    fig = go.Figure(data=go.Heatmap(
-        z=matrix,
-        colorscale='YlOrRd',
+    # Создаем цветовую шкалу для отображения мощности
+    max_value = matrix.max()
+    min_value = display_matrix.min()
+    colorscale = [
+        [0, 'rgb(255,255,255)'],  # Белый для нулевых значений
+        [0.2, 'rgb(200,230,255)'],  # Светло-синий для слабых значений
+        [0.4, 'rgb(150,200,255)'],
+        [0.6, 'rgb(100,150,255)'],
+        [0.8, 'rgb(50,100,255)'],
+        [1.0, 'rgb(0,0,255)']  # Синий для максимальных значений
+    ]
+    
+    # Создаем фигуру
+    fig = go.Figure()
+    
+    # Добавляем основную тепловую карту с мощностью
+    fig.add_trace(go.Heatmap(
+        z=display_matrix,
+        colorscale=colorscale,
         x=[f"Пер.{j+1}" for j in range(n)],
         y=[f"Отр.{i+1}" for i in range(n)],
         hoverinfo="text",
         hovertext=hovertext,
-        texttemplate="%{z}",
-        textfont={"size": 12}
+        texttemplate="%{z:.1f}",
+        textfont={"size": 12, "color": "black"},
+        showscale=True,
+        colorbar=dict(
+            title="Мощность",
+            titleside="right"
+        )
     ))
     
     # Добавляем маркеры для атакованных целей
@@ -120,14 +153,50 @@ def create_matrix_plot(matrix, schedule):
                 font=dict(size=14, color='red')
             ))
     
+    # Добавляем линии для разделения периодов
+    shapes = []
+    for i in range(n+1):
+        shapes.append(dict(
+            type="line",
+            x0=-0.5,
+            x1=n-0.5,
+            y0=i-0.5,
+            y1=i-0.5,
+            line=dict(color="black", width=1)
+        ))
+        shapes.append(dict(
+            type="line",
+            x0=i-0.5,
+            x1=i-0.5,
+            y0=-0.5,
+            y1=n-0.5,
+            line=dict(color="black", width=1)
+        ))
+    
+    # Добавляем рамку для выделения атакованных целей
+    for j in range(n):
+        for i in schedule[j]:
+            shapes.append(dict(
+                type="rect",
+                x0=j-0.5,
+                x1=j+0.5,
+                y0=i-0.5,
+                y1=i+0.5,
+                line=dict(color="red", width=2),
+                fillcolor="rgba(255,0,0,0.1)"
+            ))
+    
     fig.update_layout(
-        title="Матрица огневой мощи (⚔️ - атакованные цели)",
+        title="Матрица огневой мощи с учетом ослабления атакованных целей",
         xaxis_title="Периоды времени",
         yaxis_title="Подразделения", 
         annotations=annotations,
+        shapes=shapes,
         width=600,
         height=600,
-        margin=dict(l=60, r=30, t=80, b=60)
+        margin=dict(l=60, r=30, t=80, b=60),
+        plot_bgcolor='white',
+        paper_bgcolor='white'
     )
     
     return fig
@@ -137,9 +206,17 @@ def create_schedule_plot(schedule):
     n = len(schedule)
     attack_matrix = np.zeros((n, n))
     
+    # Создаем матрицу атак с дополнительной информацией
     for j in range(n):
         for i in schedule[j]:
             attack_matrix[i, j] += 1
+    
+    # Создаем текст для подсказок с информацией о последовательности атак
+    hovertext = [[
+        f"Отр.{i+1} Пер.{j+1}<br>" +
+        f"{'Не атаковано' if attack_matrix[i,j] == 0 else f'Атаковано {int(attack_matrix[i,j])} раз'}<br>" +
+        f"{'Первая атака' if attack_matrix[i,j] == 1 else 'Вторая атака' if attack_matrix[i,j] == 2 else ''}"
+        for j in range(n)] for i in range(n)]
     
     fig = go.Figure(data=go.Heatmap(
         z=attack_matrix,
@@ -147,16 +224,14 @@ def create_schedule_plot(schedule):
         x=[f"Пер.{j+1}" for j in range(n)],
         y=[f"Отр.{i+1}" for i in range(n)],
         hoverinfo="text",
-        hovertext=[[
-            f"Отр.{i+1} {'не атаковано' if attack_matrix[i,j] == 0 else f'атаковано {int(attack_matrix[i,j])} раз'} в Пер.{j+1}"
-            for j in range(n)] for i in range(n)],
-        text=[["" if val == 0 else "1×" if val == 1 else "2×" for val in row] for row in attack_matrix],
+        hovertext=hovertext,
+        text=[["" if val == 0 else "1" if val == 1 else "2" for val in row] for row in attack_matrix],
         texttemplate="%{text}",
-        textfont={"size": 14}
+        textfont={"size": 14, "color": "black"}
     ))
     
     fig.update_layout(
-        title="Расписание атак (макс. 2 удара за период)",
+        title="Оптимальное расписание атак (1 - первая атака, 2 - вторая атака)",
         xaxis_title="Периоды времени",
         yaxis_title="Подразделения",
         width=600,
