@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Оптимизация распределения боевой мощи</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        :root {
+            --primary: #4a89dc;
+            --primary-light: #5d9cec;
+            --primary-dark: #3b7dd8;
+            --secondary: #a0d468;
+            --accent: #ed5565;
+            --dark: #434a54;
+            --light: #f5f7fa;
+            --white: #ffffff;
+            --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.12);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+    
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+    
+        body {
+            font-family: 'Roboto', sans-serif;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #f0f2f5;
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 0; /* Убираем padding */
+            margin: 0;  /* Убираем margin */
+        }
+
+        #app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            }
+    
+        .container {
+            max-width: 100%; /* Убираем ограничение по ширине */
+            margin: 0;       /* Убираем автоматические отступы */
+            border-radius: 0; /* Убираем скругление углов */
+            box-shadow: none; /* Убираем тень */
+            height: 100vh;
+        }
+    
+        /* Новые стили для обработки больших матриц */
+        .matrix-scroll-container {
+            max-width: 100%;
+            overflow-x: auto;
+            margin-bottom: 20px;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-sm);
+        }
+    
+        .fixed-header {
+            position: sticky;
+            top: 0;
+            background-color: var(--primary);
+            color: white;
+            z-index: 10;
+        }
+    
+        .fixed-first-column {
+            position: sticky;
+            left: 0;
+            background-color: var(--white);
+            z-index: 5;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+        }
+    
+        .results-scroll-container {
+            max-height: 600px;
+            overflow-y: auto;
+            margin-top: 20px;
+            border-radius: var(--radius-sm);
+        }
+    
+        /* Стили для таблиц с большими матрицами */
+        .matrix-table,
+        .schedule-table {
+            max-height: 600px; /* Увеличиваем максимальную высоту таблиц */
+            overflow-y: auto;
+        }
+    
+        @media (max-width: 768px) {
+            .matrix-table {
+                font-size: 0.75rem;
+            }
+    
+            .matrix-table th,
+            .matrix-table td {
+                padding: 6px;
+                min-width: 35px;
+            }
+        }
+
+        /* Адаптивность */
+        @media (max-width: 1200px) {
+            .input-section { width: 45%; }
+            .results-section { width: 55%; }
+        }
+    
+        header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: var(--white);
+            padding: 15px 0;
+            text-align: center;
+        }
+    
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+    
+        .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+    
+        .main-content {
+            padding: 15px; /* Уменьшаем отступы */
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px; /* Уменьшаем промежуток между колонками */
+            height: calc(100vh - 80px); /* Учитываем высоту header */
+        }
+    
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    
+        /* Обновленные стили для контейнера ввода */
+        .input-section {
+            width: 100%;
+            height: calc(100vh - 95px); /* Учитываем высоту header */
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: white;
+            padding: 15px;
+            padding-right: 10px;
+        }
+
+         /* Фиксируем кнопки внизу */
+        .buttons-container {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 15px 0;
+            margin-top: auto; /* Прижимаем к низу */
+            box-shadow: 0 -5px 10px rgba(0,0,0,0.05);
+            z-index: 10;
+        }
+
+        /* Улучшаем скроллбар */
+        .input-section::-webkit-scrollbar {
+                width: 8px;
+            }
+
+        .input-section::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .input-section::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        .input-section::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .results-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: white;
+            padding: 15px;
+            padding-right: 10px;
+            }
+                
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--primary-dark);
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--light);
+        }
+    
+        .form-group {
+            margin-bottom: 20px;
+        }
+    
+        label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--dark);
+        }
+    
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+    
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(74, 137, 220, 0.2);
+        }
+    
+        /* Оптимизация таблицы */
+        .matrix-table {
+            table-layout: fixed;
+            min-width: 100%;
+        }
+    
+        .matrix-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin-bottom: 20px;
+        }
+    
+        .matrix-table th, 
+        .matrix-table td {
+            min-width: 50px;
+            max-width: 80px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+    
+        .matrix-table th {
+            background-color: var(--primary);
+            color: var(--white);
+            font-weight: 500;
+        }
+    
+        .matrix-table td {
+            background-color: var(--white);
+        }
+    
+        .matrix-table input {
+            width: 100%; /* Заполняем всю ячейку */
+            box-sizing: border-box;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+        }
+        /* Контейнер для больших матриц */
+        .matrix-scroll-wrapper {
+            max-height: 40vh;
+            overflow: auto;
+            margin: 15px 0;
+            border: 1px solid #eee;
+            }
+    
+        .buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+    
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            flex: 1;
+        }
+    
+        .btn-primary {
+            background-color: var(--primary);
+            color: var(--white);
+        }
+    
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+    
+        .btn-secondary {
+            background-color: var(--light);
+            color: var(--dark);
+        }
+    
+        .btn-secondary:hover {
+            background-color: #e6e9ed;
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-sm);
+        }
+    
+        /* Results Section */
+        .results-container {
+            display: none;
+        }
+    
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+            width: 100%;
+        }
+    
+        .stat-card {
+            background-color: var(--white);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            text-align: center;
+            min-width: 200px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+        }
+    
+        .stat-value {
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            font-weight: 700;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+    
+        .stat-label {
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            color: #777;
+            margin-bottom: 5px;
+        }
+    
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: clamp(0.7rem, 1.5vw, 0.8rem);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+    
+        .badge-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+    
+        .badge-success {
+            background-color: var(--secondary);
+            color: white;
+        }
+    
+        .badge-danger {
+            background-color: var(--accent);
+            color: white;
+        }
+    
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+        }
+    
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+    
+            .stat-card {
+                min-width: 100%;
+            }
+        }
+    
+        .viz-container {
+            margin-top: 25px;
+        }
+    
+        .plot-container {
+            height: 300px;
+            margin-bottom: 20px;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+    
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+    
+        .schedule-table th, .schedule-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+    
+        .schedule-table th {
+            background-color: var(--light);
+            font-weight: 500;
+        }
+    
+        .schedule-table tr:hover td {
+            background-color: rgba(74, 137, 220, 0.05);
+        }
+    
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            display: none;
+        }
+    
+        .loading-content {
+            text-align: center;
+        }
+    
+        .spinner {
+            border: 5px solid rgba(74, 137, 220, 0.2);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+    
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    
+        /* Добавляем стили для адаптивности результатов */
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+    
+            .results-section {
+                margin-top: 30px;
+            }
+        }
+    
+        @media (max-width: 768px) {
+            .plot-container {
+                height: 250px;
+            }
+        }
+
+        @media (max-width: 768px) {
+        #app-container { flex-direction: column; }
+        .input-section, .results-section {
+                width: 100%;
+                height: auto;
+                max-height: 50vh;
+        }
+    }   
+        /* Стили для выпадающего списка */
+        select.form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: var(--radius-sm);
+            background-color: white;
+            font-size: 14px;
+            color: var(--dark);
+            cursor: pointer;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+    
+        select.form-control:hover {
+            border-color: var(--primary-light);
+        }
+    
+        select.form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(74, 137, 220, 0.1);
+            outline: none;
+        }
+    
+        /* Стили для групп в выпадающем списке */
+        optgroup {
+            font-weight: 600;
+            color: var(--primary);
+            background-color: var(--light);
+            padding: 8px;
+        }
+    
+        option {
+            padding: 8px;
+            color: var(--dark);
+            background-color: white;
+        }
+    
+        option:hover {
+            background-color: var(--light);
+        }
+    </style>     
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Оптимизация распределения боевой мощи</h1>
+        </header>
+
+        <div class="main-content">
+            <div class="input-section">
+                <h2>Параметры задачи</h2>
+                
+                <div class="form-group">
+                    <label for="matrix-size">Размер матрицы (n):</label>
+                    <select id="matrix-size" onchange="resizeMatrix()">
+                        <option value="2">2</option>
+                        <option value="3" selected>3</option>
+                        <option value="4">4</option>
+                        <option value="5">5</option>
+                        <option value="6">6</option>
+                        <option value="7">7</option>
+                        <option value="8">8</option>
+                        <option value="9">9</option>
+                        <option value="10">10</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="k-value">Коэффициент ослабления (k):</label>
+                    <input type="number" id="k-value" min="2" max="10" value="2">
+                </div>
+
+                <div class="form-group">
+                    <label for="task-select">Выберите номер задачи:</label>
+                    <select id="task-select" class="form-control">
+                        <option value="1" selected>Задача 1 (оптимальное распределение)</option>
+                        <option value="2">Задача 2 (модифицированная мощность)</option>
+                        <option value="3">Задача 3 / 4 (динамическое распределение)</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="example-select">Примеры:</label>
+                    <select id="example-select" class="form-control" onchange="loadExample()">
+                        <option value="">Выберите пример...</option>
+                        <optgroup label="Матрицы 2x2">
+                            <option value="example2x2_1">Пример 1 (2x2) - Базовый</option>
+                            <option value="example2x2_2">Пример 2 (2x2) - Повышенная мощность</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 3x3">
+                            <option value="example3x3_1">Пример 3 (3x3) из пособия</option>
+                            <option value="example3x3_2">Пример 4 (3x3) - Асимметричный</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 4x4">
+                            <option value="example4x4_1">Пример 5 (4x4) - Симметричный</option>
+                            <option value="example4x4_2">Пример 6 (4x4) - Циклический</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 5x5">
+                            <option value="example5x5_1">Пример 7 (5x5) - Циклический</option>
+                            <option value="example5x5_2">Пример 8 (5x5) - Разные значения</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 6x6">
+                            <option value="example6x6_1">Пример 9 (6x6) - Сбалансированный</option>
+                            <option value="example6x6_2">Пример 10 (6x6) - Высокая мощность</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 10x10">
+                            <option value="example10x10">Пример 12 (10x10) - Большая матрица</option>
+                        </optgroup>
+                        <optgroup label="Матрицы 20x20">
+                            <option value="example20x20">Пример 13 (20x20) - Большая матрица</option>
+                        </optgroup>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="strategy-select">Стратегия оптимизации:</label>
+                    <select id="strategy-select" class="form-control">
+                        <option value="optimal" selected>Оптимальная (венгерский алгоритм)</option>
+                        <option value="greedy">Жадная стратегия</option>
+                        <option value="quasi">Квазиоптимальная стратегия</option>
+                    </select>
+                </div>
+
+                <h2 style="margin-top: 30px;">Матрица мощности</h2>
+                <div class="matrix-container">
+                    <table class="matrix-table" id="matrix-table">
+                        <!-- Матрица будет сгенерирована JavaScript -->
+                    </table>
+                    
+                    <div class="buttons">
+                        <button class="btn-primary" onclick="calculate()">Рассчитать</button>
+                        <button class="btn-secondary" onclick="clearMatrix()">Очистить</button>
+                        <button class="btn-tertiary" onclick="compareStrategies()">Сравнить стратегии</button> <!--!!!-->
+                    </div>
+                </div>
+            </div>
+
+            <div class="results-section" id="results-section" style="display: none;">
+                <h2>Результаты оптимизации</h2>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Исходная мощность вражеских отрядов</div>
+                        <div class="stat-value" id="initial-power">0</div>
+                        <div class="badge badge-primary">Суммарный показатель</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Итоговая мощность после атаки</div>
+                        <div class="stat-value" id="final-power">0</div>
+                        <div class="badge badge-success">После оптимизации</div>
+                    </div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-label">Эффективность</div>
+                        <div class="stat-value" id="efficiency">0%</div>
+                        <div class="badge badge-danger">Снижение мощности</div>
+                    </div>
+                </div>
+
+                <div class="viz-container">
+                    <h3>Матрица боевой мощи</h3>
+                    <div class="plot-container" id="matrix-plot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="loading" class="loading-overlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Выполняется расчет...</p>
+        </div>
+    </div>
+    
+    <script>
+        function updatePlotLayout() {
+            const plots = ['matrix-plot'];
+            plots.forEach(id => {
+                Plotly.relayout(id, {
+                    autosize: true,
+                    margin: {
+                        l: 50,
+                        r: 30,
+                        b: 50,
+                        t: 30,
+                        pad: 4
+                    }
+                });
+            });
+
+            // Adjust the height of the results section based on the size of the content
+            const resultsSection = document.getElementById('results-section');
+            const resultHeight = resultsSection.scrollHeight;
+            resultsSection.style.maxHeight = `${Math.min(resultHeight, 700)}px`;
+        }
+
+        window.addEventListener('resize', updatePlotLayout);
+
+        function initMatrix() {
+            const size = parseInt(document.getElementById('matrix-size').value);
+            const table = document.getElementById('matrix-table');
+            table.innerHTML = '';
+    
+            // Добавляем класс для скролла при больших матрицах
+            if (size > 6) {
+                table.parentElement.classList.add('matrix-scroll-container');
+            } else {
+                table.parentElement.classList.remove('matrix-scroll-container');
+            }
+    
+            let headerRow = table.insertRow();
+            headerRow.insertCell();
+            for (let j = 0; j < size; j++) {
+                const th = document.createElement('th');
+                th.textContent = `P${j+1}`;
+                th.classList.add('fixed-header');
+                headerRow.appendChild(th);
+            }
+    
+            for (let i = 0; i < size; i++) {
+                const row = table.insertRow();
+                const th = document.createElement('th');
+                th.textContent = `U${i+1}`;
+                th.classList.add('fixed-first-column');
+                row.appendChild(th);
+        
+                for (let j = 0; j < size; j++) {
+                    const cell = row.insertCell();
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '100';
+                    input.value = '0';
+                    input.dataset.row = i;
+                    input.dataset.col = j;
+                    cell.appendChild(input);
+                }
+            }
+        }
+        
+        function resizeMatrix() {
+            initMatrix();
+            document.getElementById('results-section').style.display = 'none';
+        }
+        
+        function clearMatrix() {
+            const inputs = document.querySelectorAll('#matrix-table input');
+            inputs.forEach(input => input.value = '1');
+            document.getElementById('k-value').value = '2';
+            document.getElementById('example-select').value = '';
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('performance-body').innerHTML = '';
+        }
+        
+        function loadExample() {
+            const examples = {
+                'example2x2_1': {
+                    matrix: [[3, 6], [5, 2]],
+                    k: 2
+                },
+                'example2x2_2': {
+                    matrix: [[7, 4], [3, 8]],
+                    k: 3
+                },
+                'example3x3_1': {
+                    matrix: [[5, 4, 2], [4, 5, 4], [2, 4, 5]],
+                    k: 2
+                },
+                'example3x3_2': {
+                    matrix: [[6, 3, 5], [2, 7, 4], [4, 5, 3]],
+                    k: 2
+                },
+                'example4x4_1': {
+                    matrix: [[3, 5, 2, 4], [4, 2, 5, 3], [5, 3, 4, 2], [2, 4, 3, 5]],
+                    k: 3
+                },
+                'example4x4_2': {
+                    matrix: [[4, 2, 6, 3], [3, 4, 2, 6], [6, 3, 4, 2], [2, 6, 3, 4]],
+                    k: 2
+                },
+                'example5x5_1': {
+                    matrix: [
+                        [4, 2, 5, 3, 1],
+                        [2, 5, 3, 1, 4],
+                        [5, 3, 1, 4, 2],
+                        [3, 1, 4, 2, 5],
+                        [1, 4, 2, 5, 3]
+                    ],
+                    k: 2
+                },
+                'example5x5_2': {
+                    matrix: [
+                        [6, 3, 4, 2, 5],
+                        [4, 5, 2, 6, 3],
+                        [2, 6, 5, 3, 4],
+                        [5, 2, 3, 4, 6],
+                        [3, 4, 6, 5, 2]
+                    ],
+                    k: 3
+                },
+                'example6x6_1': {
+                    matrix: [
+                        [5, 3, 4, 6, 2, 1],
+                        [2, 6, 3, 1, 5, 4],
+                        [4, 1, 5, 2, 3, 6],
+                        [3, 5, 1, 4, 6, 2],
+                        [6, 2, 4, 3, 1, 5],
+                        [1, 4, 6, 5, 2, 3]
+                    ],
+                    k: 2
+                },
+                'example6x6_2': {
+                    matrix: [
+                        [8, 4, 6, 3, 7, 5],
+                        [5, 7, 3, 8, 4, 6],
+                        [6, 3, 7, 5, 8, 4],
+                        [4, 8, 5, 6, 3, 7],
+                        [7, 5, 4, 8, 6, 3],
+                        [3, 6, 8, 4, 5, 7]
+                    ],
+                    k: 3
+                },
+                'example10x10': {
+                    matrix: [
+                        [5, 3, 7, 2, 8, 4, 6, 1, 9, 2],
+                        [2, 8, 4, 6, 1, 9, 3, 7, 5, 3],
+                        [7, 5, 9, 3, 6, 2, 8, 4, 1, 6],
+                        [4, 6, 2, 8, 5, 7, 1, 9, 3, 4],
+                        [9, 1, 6, 4, 7, 3, 5, 2, 8, 5],
+                        [3, 7, 1, 9, 4, 8, 2, 6, 4, 7],
+                        [8, 4, 5, 1, 9, 6, 7, 3, 2, 8],
+                        [6, 2, 8, 5, 3, 1, 9, 5, 7, 1],
+                        [1, 9, 3, 7, 2, 5, 4, 8, 6, 9],
+                        [5, 3, 7, 2, 8, 4, 6, 1, 9, 2]
+                    ],
+                    k: 2
+                },
+                'example20x20': {
+                    matrix: [
+                        [8, 3, 6, 2, 9, 4, 7, 1, 5, 2, 7, 4, 6, 3, 8, 5, 9, 2, 4, 1],
+                        [4, 9, 2, 7, 3, 8, 5, 6, 1, 5, 3, 7, 2, 8, 4, 6, 1, 9, 3, 7],
+                        [7, 2, 8, 4, 6, 1, 9, 3, 7, 4, 8, 2, 5, 9, 3, 7, 2, 6, 8, 4],
+                        [5, 6, 3, 9, 2, 7, 4, 8, 6, 1, 5, 9, 4, 6, 2, 8, 5, 3, 7, 9],
+                        [2, 8, 5, 1, 7, 3, 6, 9, 4, 7, 2, 6, 9, 1, 5, 3, 8, 4, 6, 2],
+                        [9, 4, 7, 5, 8, 2, 3, 7, 9, 6, 4, 1, 7, 5, 9, 2, 6, 8, 1, 5],
+                        [3, 7, 1, 8, 4, 9, 2, 5, 3, 8, 6, 5, 1, 7, 6, 9, 3, 5, 2, 8],
+                        [6, 1, 9, 3, 5, 6, 8, 2, 8, 3, 9, 8, 3, 4, 7, 1, 4, 7, 5, 6],
+                        [1, 5, 4, 6, 1, 5, 1, 4, 2, 9, 1, 3, 8, 2, 1, 4, 7, 1, 9, 3],
+                        [7, 3, 6, 2, 9, 4, 7, 1, 5, 2, 7, 4, 6, 3, 8, 5, 9, 2, 4, 1],
+                        [4, 9, 2, 7, 3, 8, 5, 6, 1, 5, 3, 7, 2, 8, 4, 6, 1, 9, 3, 7],
+                        [7, 2, 8, 4, 6, 1, 9, 3, 7, 4, 8, 2, 5, 9, 3, 7, 2, 6, 8, 4],
+                        [5, 6, 3, 9, 2, 7, 4, 8, 6, 1, 5, 9, 4, 6, 2, 8, 5, 3, 7, 9],
+                        [2, 8, 5, 1, 7, 3, 6, 9, 4, 7, 2, 6, 9, 1, 5, 3, 8, 4, 6, 2],
+                        [9, 4, 7, 5, 8, 2, 3, 7, 9, 6, 4, 1, 7, 5, 9, 2, 6, 8, 1, 5],
+                        [3, 7, 1, 8, 4, 9, 2, 5, 3, 8, 6, 5, 1, 7, 6, 9, 3, 5, 2, 8],
+                        [6, 1, 9, 3, 5, 6, 8, 2, 8, 3, 9, 8, 3, 4, 7, 1, 4, 7, 5, 6],
+                        [1, 5, 4, 6, 1, 5, 1, 4, 2, 9, 1, 3, 8, 2, 1, 4, 7, 1, 9, 3],
+                        [8, 3, 6, 2, 9, 4, 7, 1, 5, 2, 7, 4, 6, 3, 8, 5, 9, 2, 4, 1],
+                        [4, 9, 2, 7, 3, 8, 5, 6, 1, 5, 3, 7, 2, 8, 4, 6, 1, 9, 3, 7]
+                    ],
+                    k: 2
+                }
+            };
+            
+            const exampleKey = document.getElementById('example-select').value;
+            if (!exampleKey) return;
+            
+            const example = examples[exampleKey];
+            if (!example) {
+                console.error('Пример не найден:', exampleKey);
+                return;
+            }
+
+            // Обновляем размер матрицы и коэффициент k
+            document.getElementById('matrix-size').value = example.matrix.length;
+            document.getElementById('k-value').value = example.k;
+            
+            // Пересоздаем матрицу с новым размером
+            initMatrix();
+            
+            // Заполняем значения из примера
+            example.matrix.forEach((row, i) => {
+                row.forEach((val, j) => {
+                    const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
+                    if (input) {
+                        input.value = val;
+                    }
+                });
+            });
+
+            // Скрываем результаты при загрузке нового примера
+            document.getElementById('results-section').style.display = 'none';
+        }
+
+        function calculate() {
+            const size = parseInt(document.getElementById('matrix-size').value);
+            const k = parseFloat(document.getElementById('k-value').value);
+            const strategy = document.getElementById('strategy-select').value;  // Добавлено получение стратегии
+    
+            const matrix = [];
+            for (let i = 0; i < size; i++) {
+                const row = [];
+                for (let j = 0; j < size; j++) {
+                    const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
+                    const value = parseInt(input.value);
+                    if (isNaN(value) || value < 0 || value > 100) {
+                        alert('Все значения должны быть числами в пределах от 0 до 100');
+                        return;
+                    }
+                    row.push(value);
+                }
+                matrix.push(row);
+            }
+
+            document.getElementById('loading').style.display = 'flex';
+            document.getElementById('results-section').style.display = 'none';
+
+            // Отправляем запрос на сервер
+            fetch('/calculate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    matrix: matrix,
+                    k: k,
+                    mode: 'task' + document.getElementById('task-select').value,
+                    strategy: strategy  // Используем полученную стратегию
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    alert('Ошибка при расчете: ' + data.error);
+                }
+                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Произошла ошибка при отправке запроса');
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        function displayResults(data) {
+            try {
+                // 1. Проверка входных данных
+                if (!data || !data.results || !data.visualizations) {
+                    throw new Error("Неполные данные результатов");
+                }
+
+                // 2. Безопасное извлечение значений
+                const results = data.results;
+                const initialPower = parseFloat(results.initial_power) || 1; // Защита от 0
+                const totalPower = parseFloat(results.total_power) || 0;
+                const efficiency = initialPower > 0 
+                    ? (100 * (1 - totalPower / initialPower)).toFixed(1)
+                    : "0.0";
+
+                // 3. Обновление основных показателей
+                const safeUpdate = (id, value) => {
+                    const element = document.getElementById(id);
+                    if (element) element.textContent = value;
+                };
+
+                safeUpdate('initial-power', initialPower.toFixed(1));
+                safeUpdate('final-power', totalPower.toFixed(1));
+                safeUpdate('efficiency', efficiency + '%');
+
+                // 4. Отрисовка обязательной матрицы мощности
+                const renderMatrixPlot = () => {
+                    const container = document.getElementById('matrix-plot');
+                    if (!container) return;
+
+                    try {
+                        Plotly.purge('matrix-plot');
+                        const plotData = JSON.parse(data.visualizations.matrix_plot);
+                        Plotly.newPlot('matrix-plot', plotData.data, plotData.layout);
+                    } catch (e) {
+                        console.error("Ошибка визуализации матрицы:", e);
+                        container.innerHTML = '<p class="error">Не удалось отобразить матрицу</p>';
+                    }
+                };
+
+                // 5. Опциональное отображение расписания атак
+                const renderAttackSchedule = () => {
+                    const container = document.getElementById('schedule-table');
+                    if (!container) return;
+
+                    try {
+                        const tbody = container.querySelector('tbody') || container;
+                        tbody.innerHTML = '';
+
+                        const schedule = Array.isArray(results.schedule) ? results.schedule : [];
+                        const initialMatrix = Array.isArray(results.initial_power_matrix) 
+                            ? results.initial_power_matrix 
+                            : [];
+
+                        schedule.forEach((targets, j) => {
+                            const row = document.createElement('tr');
+                            
+                            // Период
+                            const periodCell = document.createElement('td');
+                            periodCell.textContent = j + 1;
+                            row.appendChild(periodCell);
+
+                            // Цели
+                            const targetsCell = document.createElement('td');
+                            targetsCell.textContent = targets.map(t => t + 1).join(', ');
+                            row.appendChild(targetsCell);
+
+                            // Эффект
+                            const effectCell = document.createElement('td');
+                            if (initialMatrix.length > 0) {
+                                const effects = targets.map(i => {
+                                    const initial = initialMatrix[i]?.[j] || 0;
+                                    const current = initial / Math.pow(data.k, 1); // Упрощенный расчет
+                                    return `Отр.${i+1}: ${initial.toFixed(1)}→${current.toFixed(1)}`;
+                                });
+                                effectCell.textContent = effects.join('; ');
+                            } else {
+                                effectCell.textContent = "Данные не доступны";
+                            }
+                            row.appendChild(effectCell);
+
+                            tbody.appendChild(row);
+                        });
+                    } catch (e) {
+                        console.error("Ошибка отображения расписания:", e);
+                        container.innerHTML = '<p class="error">Ошибка формирования расписания</p>';
+                    }
+                };
+
+                // 6. Опциональная таблица производительности
+                const renderPerformanceTable = () => {
+                    const container = document.getElementById('performance-table');
+                    if (!container) return;
+
+                    try {
+                        const tbody = container.querySelector('tbody') || container;
+                        tbody.innerHTML = '';
+
+                        const row = document.createElement('tr');
+                        
+                        ['matrix_size', 'computation_time', 'operations'].forEach(key => {
+                            const cell = document.createElement('td');
+                            cell.textContent = results[key] 
+                                ? (key === 'computation_time' 
+                                    ? parseFloat(results[key]).toFixed(2) 
+                                    : results[key])
+                                : 'N/A';
+                            row.appendChild(cell);
+                        });
+
+                        tbody.appendChild(row);
+                    } catch (e) {
+                        console.error("Ошибка таблицы производительности:", e);
+                    }
+                };
+
+                // 7. Выполнение всех функций отрисовки
+                renderMatrixPlot();
+                renderAttackSchedule();
+                renderPerformanceTable();
+
+                // 8. Показываем результаты
+                const resultsSection = document.getElementById('results-section');
+                if (resultsSection) {
+                    resultsSection.style.display = 'block';
+                    updatePlotLayout();
+                }
+
+            } catch (error) {
+                console.error("Критическая ошибка в displayResults:", error);
+                alert("Произошла ошибка при отображении результатов. Проверьте консоль для деталей.");
+            }
+        }
+        
+        function compareStrategies() {
+            const size = parseInt(document.getElementById('matrix-size').value);
+            const k = parseFloat(document.getElementById('k-value').value);
+            const mode = 'task' + document.getElementById('task-select').value;
+
+            const matrix = [];
+            for (let i = 0; i < size; i++) {
+                const row = [];
+                for (let j = 0; j < size; j++) {
+                    const input = document.querySelector(`input[data-row="${i}"][data-col="${j}"]`);
+                    row.push(parseInt(input.value));
+                }
+                matrix.push(row);
+            }
+
+            document.getElementById('loading').style.display = 'flex';
+            
+            // Запросы для всех стратегий
+            const strategies = ['optimal', 'greedy', 'quasi'];
+            const requests = strategies.map(strategy => {
+                // Замеряем время выполнения на клиенте
+                const startTime = performance.now();
+                
+                return fetch('/calculate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({matrix, k, mode, strategy})
+                })
+                .then(res => res.json())
+                .then(data => {
+                    const endTime = performance.now();
+                    const executionTime = endTime - startTime;
+                    
+                    return {
+                        ...data,
+                        clientComputationTime: executionTime
+                    };
+                });
+            });
+
+            Promise.all(requests)
+                .then(results => {
+                    displayComparison(results);
+                    document.getElementById('loading').style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading').style.display = 'none';
+                });
+        }
+        
+        function displayComparison(results) {
+            const comparisonDiv = document.createElement('div');
+            comparisonDiv.id = 'strategy-comparison';
+            comparisonDiv.className = 'comparison-container';
+            
+            // Заголовок
+            const title = document.createElement('h3');
+            title.textContent = 'Сравнение стратегий';
+            comparisonDiv.appendChild(title);
+
+            // Таблица сравнения
+            const table = document.createElement('table');
+            table.className = 'comparison-table';
+            
+            // Заголовки столбцов
+            const headerRow = document.createElement('tr');
+            ['Стратегия', 'Итоговая мощность', 'Эффективность', 'Время (мс)'].forEach(text => {
+                const th = document.createElement('th');
+                th.textContent = text;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            // Данные
+            const strategyNames = {
+                'optimal': 'Оптимальная (венгерский алгоритм)',
+                'greedy': 'Жадная стратегия'    , 
+                'quasi': 'Квазиоптимальная стратегия'
+            };
+
+            results.forEach(data => {
+                const row = document.createElement('tr');
+                
+                // Название стратегии
+                const strategyCell = document.createElement('td');
+                strategyCell.textContent = strategyNames[data.results.strategy];
+                row.appendChild(strategyCell);
+
+                // Итоговая мощность
+                const powerCell = document.createElement('td');
+                powerCell.textContent = data.results.total_power.toFixed(2);
+                powerCell.className = 'numeric-value';
+                row.appendChild(powerCell);
+
+                // Эффективность
+                const effCell = document.createElement('td');
+                const initialPower = data.results.initial_power || 1;
+                const efficiency = 100 * (1 - data.results.total_power / initialPower);
+                effCell.textContent = efficiency.toFixed(1) + '%';
+                effCell.className = 'numeric-value';
+                row.appendChild(effCell);
+
+                // Время
+                const timeCell = document.createElement('td');
+                const time = data.results.computation_time || data.clientComputationTime;
+                timeCell.textContent = time.toFixed(2);
+                timeCell.className = 'numeric-value';
+                row.appendChild(timeCell);
+
+                table.appendChild(row);
+            });
+
+            // Добавляем пояснение для малых матриц
+            if (results[0].results.matrix_size <= 3) {
+                const explanation = document.createElement('p');
+                explanation.style.fontStyle = 'italic';
+                explanation.style.color = '#666';
+                explanation.textContent = 'Примечание: для малых матриц (2x2, 3x3) все стратегии могут давать одинаковые результаты, так как количество возможных комбинаций ограничено. Различия становятся заметны на матрицах 4x4 и больше.';
+                comparisonDiv.appendChild(explanation);
+            }
+
+            comparisonDiv.appendChild(table);
+            
+            // Удаляем предыдущее сравнение (если было)
+            const oldComparison = document.getElementById('strategy-comparison');
+            if (oldComparison) oldComparison.remove();
+            
+            // Добавляем в раздел результатов
+            const resultsSection = document.getElementById('results-section');
+            resultsSection.insertBefore(comparisonDiv, resultsSection.firstChild);
+            resultsSection.style.display = 'block';
+        }
+        document.addEventListener('DOMContentLoaded', initMatrix);
+    </script>
+</body>
+</html>
